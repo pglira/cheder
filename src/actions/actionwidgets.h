@@ -9,11 +9,9 @@
 #include <QPushButton>
 #include <QWidget>
 
-// Default width for all action parameter dialogs. Set as a minimum width so
-// the dialog opens wide but the user can grow it further if they want.
+// Set as a minimum so the dialog opens wide but the user can grow it.
 constexpr int kActionDialogMinWidth = 800;
 
-// Bold label summarising how many input files the action will run against.
 inline QLabel *makeInputsLabel(int count, QWidget *parent) {
     auto *label = new QLabel(parent);
     label->setText(QString("Inputs: %1 file%2").arg(count).arg(count == 1 ? "" : "s"));
@@ -23,19 +21,13 @@ inline QLabel *makeInputsLabel(int count, QWidget *parent) {
     return label;
 }
 
-// Common dialog setup: enforce the standard width and let layout determine
-// height. Call after the layout has been built.
 inline void styleActionDialog(QDialog &dlg) {
     dlg.setMinimumWidth(kActionDialogMinWidth);
 }
 
-// Composes `edit` and a "..." button that opens a directory picker into a
-// single horizontal row. The picker prefills with the edit's current text and
-// writes the chosen path back into `edit` on accept. Returns the row widget,
-// suitable for QFormLayout::addRow as the field widget.
-//
-// Header-only because every action dialog wires the same idiom — keeps the
-// helper next to the action sources without a separate translation unit.
+// Wraps `edit` with a "..." button that opens a directory picker; the picker
+// prefills with the edit's current text and writes the choice back. Returns
+// the composed row, suitable as a QFormLayout field widget.
 inline QWidget *outputDirField(QLineEdit *edit, QWidget *parent) {
     auto *row = new QWidget(parent);
     auto *layout = new QHBoxLayout(row);

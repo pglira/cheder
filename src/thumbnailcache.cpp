@@ -16,9 +16,9 @@ const char *const kMTimeKey   = "Thumb::MTime";
 const char *const kUriKey     = "Thumb::URI";
 const char *const kVersionKey = "Thumb::Cheder::Version";
 
-// Decode `sourcePath` and shrink it to fit within kCanonicalMaxSize while
-// preserving aspect ratio. Honors EXIF orientation. Sources already smaller
-// than the canonical box are returned unchanged (no upscaling).
+// Decode the source and shrink it to fit kCanonicalMaxSize, preserving
+// aspect ratio and honoring EXIF orientation. Already-small sources are
+// returned untouched — never upscale a thumbnail.
 QImage composeCanonical(const QString &sourcePath) {
     QImageReader reader(sourcePath);
     reader.setAutoTransform(true);

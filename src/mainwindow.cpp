@@ -1,14 +1,14 @@
 #include "mainwindow.h"
 
-#include "action.h"
-#include "actionbar.h"
-#include "actionregistry.h"
-#include "copymoveaction.h"
+#include "actions/action.h"
+#include "actions/actionbar.h"
+#include "actions/actionregistry.h"
+#include "actions/copymoveaction.h"
+#include "actions/resizeaction.h"
+#include "actions/rotateaction.h"
 #include "imagedir.h"
 #include "imageview.h"
 #include "infopanel.h"
-#include "resizeaction.h"
-#include "rotateaction.h"
 #include "thumbnailview.h"
 
 #include <QApplication>
@@ -49,7 +49,7 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     m_stack->addWidget(m_thumbSplitter);
     m_stack->addWidget(m_imageView);
 
-    statusBar();  // create the status bar so showMessage works
+    statusBar();  // ensures the bar exists for later showMessage() calls
 
     m_actions->add(std::make_unique<RotateAction>());
     m_actions->add(std::make_unique<ResizeAction>());
@@ -164,8 +164,8 @@ void MainWindow::runAction(Action *action) {
         const QString outDir = QFileInfo(outputs.first()).absolutePath();
         statusBar()->showMessage(
             QString("Wrote %1 file(s) to %2").arg(outputs.size()).arg(outDir), 7000);
-        // Source dir contents may have changed (move took files away, in-place
-        // modes touched mtimes, etc.). Re-scan so the views match disk.
+        // Move could have taken files away; in-place edits touch mtimes —
+        // re-scan so the views match disk.
         reload();
     }
     m_actionBar->resetState();
@@ -183,7 +183,9 @@ void MainWindow::reload() {
     const QString currentImagePath = m_imageView->currentPath();
 
     m_files = listImagesInDir(m_sourceDir);
-    m_thumbView->setFiles(m_files);  // preserves selection by tooltip path
+    // ThumbnailView::setFiles preserves selection by tooltip path; ImageView
+    // clamps the index, so we re-locate the previous image afterwards.
+    m_thumbView->setFiles(m_files);
     m_imageView->setFiles(m_files);
 
     if (!currentImagePath.isEmpty()) {

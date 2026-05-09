@@ -11,7 +11,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
-#include <QLayoutItem>
 #include <QLocale>
 #include <QPixmap>
 #include <QProcess>
@@ -49,10 +48,10 @@ InfoPanel::InfoPanel(ThumbnailCache *cache, QWidget *parent)
     m_thumb->setMinimumSize(1, 1);
     root->addWidget(m_thumb, 0, Qt::AlignHCenter);
 
-    m_separator = new QFrame(this);
-    m_separator->setFrameShape(QFrame::HLine);
-    m_separator->setFrameShadow(QFrame::Sunken);
-    root->addWidget(m_separator);
+    auto *separator = new QFrame(this);
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    root->addWidget(separator);
 
     auto *fields = new QWidget(this);
     m_form = new QFormLayout(fields);

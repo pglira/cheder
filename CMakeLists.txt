@@ -9,28 +9,29 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 add_executable(cheder
     src/main.cpp
-    src/mainwindow.cpp
-    src/mainwindow.h
-    src/thumbnailview.cpp
-    src/thumbnailview.h
-    src/thumbnailcache.cpp
-    src/thumbnailcache.h
     src/imagedir.h
     src/imageview.cpp
     src/imageview.h
     src/infopanel.cpp
     src/infopanel.h
-    src/action.h
-    src/actionregistry.cpp
-    src/actionregistry.h
-    src/actionbar.cpp
-    src/actionbar.h
-    src/actionwidgets.h
-    src/rotateaction.cpp
-    src/rotateaction.h
-    src/resizeaction.cpp
-    src/resizeaction.h
-    src/copymoveaction.cpp
-    src/copymoveaction.h
+    src/mainwindow.cpp
+    src/mainwindow.h
+    src/thumbnailcache.cpp
+    src/thumbnailcache.h
+    src/thumbnailview.cpp
+    src/thumbnailview.h
+
+    src/actions/action.h
+    src/actions/actionbar.cpp
+    src/actions/actionbar.h
+    src/actions/actionregistry.cpp
+    src/actions/actionregistry.h
+    src/actions/actionwidgets.h
+    src/actions/copymoveaction.cpp
+    src/actions/copymoveaction.h
+    src/actions/resizeaction.cpp
+    src/actions/resizeaction.h
+    src/actions/rotateaction.cpp
+    src/actions/rotateaction.h
 )
 target_link_libraries(cheder PRIVATE Qt6::Widgets)

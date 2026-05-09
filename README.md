@@ -1,1 +1,68 @@
 # cheder
+
+A small Qt6 image viewer with a thumbnail grid, a single-image view, and a
+text-driven action bar for batch operations (rotate, resize, copy/move).
+
+## Build
+
+Requires Qt 6 (Widgets) and a C++17 compiler.
+
+```sh
+cmake -S . -B build
+cmake --build build -j
+```
+
+The thumbnail info panel uses [`exiftool`](https://exiftool.org) for EXIF
+fields — install it for camera/lens/exposure metadata, otherwise only the
+basics are shown.
+
+## Run
+
+```sh
+./build/cheder              # prompts for file or directory
+./build/cheder /path/dir/   # opens directory in thumbnail view
+./build/cheder image.jpg    # opens that image, scoped to its parent dir
+```
+
+## Shortcuts
+
+### Thumbnail view
+
+- `Tab` / `Enter` — open first selected image in image view
+- arrow keys / `h j k l` — move within the grid
+- `g g` / `G` — first / last item
+- `+` / `-` / `Ctrl+wheel` — change thumbnail size
+- `i` — toggle the info panel
+
+### Image view
+
+- arrow keys / `n` / `p` — next / previous image
+- `Tab` / `Esc` — back to the thumbnail view
+
+### Anywhere
+
+- `:` — focus the action bar (type to filter, `Enter` runs, `Esc`/`Tab` dismiss)
+- `F5` — re-scan the source directory
+
+## Actions
+
+The action bar at the bottom of the window lists actions; type to filter,
+`Enter` to invoke. Built-in:
+
+- **Rotate** — 90° CW / CCW / 180°
+- **Resize** — by longest edge (px) or scale (%)
+- **Copy or move** — duplicate or relocate to a chosen directory
+
+Each action writes to a directory you pick in its dialog (defaults to
+`<source-dir>/<action-id>/`). After a successful run the source directory is
+re-scanned automatically.
+
+## Cache
+
+Thumbnails are cached at `~/.cache/cheder/thumbs/` as PNGs keyed by the SHA-1
+of the absolute source path. The source mtime is stored in PNG metadata, so
+edits invalidate cached entries transparently.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
