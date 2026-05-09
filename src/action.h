@@ -26,9 +26,13 @@ public:
     virtual bool acceptsCount(int n) const = 0;
 
     // Show parameter dialog. Returns false if the user cancelled.
-    // `defaultOutDir` is the suggested output directory derived from the
-    // first input's location and this action's id().
-    virtual bool configure(QWidget *parent, const QString &defaultOutDir) = 0;
+    // `inputs` is the list of source paths the action will be applied to —
+    // actions render a count or summary so the user sees what they're about
+    // to operate on. `defaultOutDir` is the suggested output directory
+    // derived from the first input's location and this action's id().
+    virtual bool configure(QWidget *parent,
+                           const QStringList &inputs,
+                           const QString &defaultOutDir) = 0;
 
     // Run the action on `inputs`. Returns the list of files actually written.
     virtual QStringList apply(const QStringList &inputs) = 0;

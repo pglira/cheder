@@ -8,7 +8,7 @@ public:
     QString name() const override        { return "Rotate"; }
     QString description() const override { return "Rotate by a fixed angle"; }
 
-    bool configure(QWidget *parent, const QString &defaultOutDir) override;
+    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
 
 protected:
     QString applyOne(const QString &input) override;

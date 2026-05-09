@@ -8,7 +8,7 @@ public:
     QString name() const override        { return "Resize"; }
     QString description() const override { return "Scale by longest edge or percent"; }
 
-    bool configure(QWidget *parent, const QString &defaultOutDir) override;
+    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
 
 protected:
     QString applyOne(const QString &input) override;

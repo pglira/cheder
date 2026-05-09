@@ -11,6 +11,7 @@ class ThumbnailView;
 class InfoPanel;
 class ImageView;
 class Action;
+class ActionBar;
 class ActionRegistry;
 
 class MainWindow : public QMainWindow {
@@ -21,6 +22,7 @@ public:
 
     void showThumbnails();
     void showImage(int index);
+    void reload();
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -34,14 +36,17 @@ private:
 
     QStringList currentInputs() const;
     QString defaultOutputDirFor(const Action *action) const;
-    void openActionPalette();
+    void runAction(Action *action);
+    void returnFocusToView();
 
     QStackedWidget *m_stack;
     QSplitter *m_thumbSplitter;
     ThumbnailView *m_thumbView;
     InfoPanel *m_infoPanel;
     ImageView *m_imageView;
+    ActionBar *m_actionBar;
     QStringList m_files;
+    QString m_sourceDir;
     std::unique_ptr<ActionRegistry> m_actions;
     bool m_translating = false;
     bool m_pendingG = false;

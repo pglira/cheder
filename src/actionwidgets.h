@@ -1,10 +1,33 @@
 #pragma once
 
+#include <QDialog>
 #include <QFileDialog>
+#include <QFont>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QWidget>
+
+// Default width for all action parameter dialogs. Set as a minimum width so
+// the dialog opens wide but the user can grow it further if they want.
+constexpr int kActionDialogMinWidth = 800;
+
+// Bold label summarising how many input files the action will run against.
+inline QLabel *makeInputsLabel(int count, QWidget *parent) {
+    auto *label = new QLabel(parent);
+    label->setText(QString("Inputs: %1 file%2").arg(count).arg(count == 1 ? "" : "s"));
+    QFont font = label->font();
+    font.setBold(true);
+    label->setFont(font);
+    return label;
+}
+
+// Common dialog setup: enforce the standard width and let layout determine
+// height. Call after the layout has been built.
+inline void styleActionDialog(QDialog &dlg) {
+    dlg.setMinimumWidth(kActionDialogMinWidth);
+}
 
 // Composes `edit` and a "..." button that opens a directory picker into a
 // single horizontal row. The picker prefills with the edit's current text and

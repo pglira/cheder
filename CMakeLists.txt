@@ -15,6 +15,7 @@ add_executable(cheder
     src/thumbnailview.h
     src/thumbnailcache.cpp
     src/thumbnailcache.h
+    src/imagedir.h
     src/imageview.cpp
     src/imageview.h
     src/infopanel.cpp
@@ -22,12 +23,14 @@ add_executable(cheder
     src/action.h
     src/actionregistry.cpp
     src/actionregistry.h
-    src/actionpalette.cpp
-    src/actionpalette.h
+    src/actionbar.cpp
+    src/actionbar.h
     src/actionwidgets.h
     src/rotateaction.cpp
     src/rotateaction.h
     src/resizeaction.cpp
     src/resizeaction.h
+    src/copymoveaction.cpp
+    src/copymoveaction.h
 )
 target_link_libraries(cheder PRIVATE Qt6::Widgets)

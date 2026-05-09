@@ -16,7 +16,7 @@
 #include <QTransform>
 #include <QVBoxLayout>
 
-bool RotateAction::configure(QWidget *parent, const QString &defaultOutDir) {
+bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Rotate");
 
@@ -43,8 +43,10 @@ bool RotateAction::configure(QWidget *parent, const QString &defaultOutDir) {
     form->addRow("Output directory", outputDirField(outEdit, &dlg));
 
     auto *root = new QVBoxLayout(&dlg);
+    root->addWidget(makeInputsLabel(inputs.size(), &dlg));
     root->addLayout(form);
     root->addWidget(buttons);
+    styleActionDialog(dlg);
 
     if (dlg.exec() != QDialog::Accepted) return false;
 

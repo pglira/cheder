@@ -1,8 +1,10 @@
 #include "mainwindow.h"
 
 #include "action.h"
-#include "actionpalette.h"
+#include "actionbar.h"
 #include "actionregistry.h"
+#include "copymoveaction.h"
+#include "imagedir.h"
 #include "imageview.h"
 #include "infopanel.h"
 #include "resizeaction.h"
@@ -18,13 +20,15 @@
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QVBoxLayout>
 
 #include <algorithm>
 
 MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     : QMainWindow(parent), m_files(files), m_actions(std::make_unique<ActionRegistry>()) {
+    if (!files.isEmpty()) m_sourceDir = QFileInfo(files.first()).absolutePath();
+
     m_stack = new QStackedWidget(this);
-    setCentralWidget(m_stack);
 
     m_thumbView = new ThumbnailView(this);
     m_thumbView->setFiles(files);
@@ -49,6 +53,20 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
 
     m_actions->add(std::make_unique<RotateAction>());
     m_actions->add(std::make_unique<ResizeAction>());
+    m_actions->add(std::make_unique<CopyMoveAction>());
+
+    m_actionBar = new ActionBar(m_actions.get(), this);
+
+    auto *centralContainer = new QWidget(this);
+    auto *vlay = new QVBoxLayout(centralContainer);
+    vlay->setContentsMargins(0, 0, 0, 0);
+    vlay->setSpacing(0);
+    vlay->addWidget(m_stack, 1);
+    vlay->addWidget(m_actionBar);
+    setCentralWidget(centralContainer);
+
+    connect(m_actionBar, &ActionBar::actionInvoked, this, &MainWindow::runAction);
+    connect(m_actionBar, &ActionBar::exitRequested, this, &MainWindow::returnFocusToView);
 
     connect(m_thumbView, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *it) {
         showImage(m_thumbView->row(it));
@@ -118,33 +136,63 @@ QString MainWindow::defaultOutputDirFor(const Action *action) const {
     return srcDir + '/' + action->id();
 }
 
-void MainWindow::openActionPalette() {
+void MainWindow::runAction(Action *action) {
+    if (!action) return;
     const QStringList inputs = currentInputs();
     if (inputs.isEmpty()) {
         statusBar()->showMessage("No image to act on", 3000);
+        m_actionBar->resetState();
+        returnFocusToView();
+        return;
+    }
+    if (!action->acceptsCount(inputs.size())) {
+        statusBar()->showMessage(
+            QString("'%1' doesn't accept %2 input(s)").arg(action->name()).arg(inputs.size()), 3000);
         return;
     }
 
-    const QList<Action *> available = m_actions->acceptingCount(inputs.size());
-    if (available.isEmpty()) {
-        statusBar()->showMessage(QString("No actions accept %1 input(s)").arg(inputs.size()), 3000);
+    if (!action->configure(this, inputs, defaultOutputDirFor(action))) {
+        m_actionBar->resetState();
+        returnFocusToView();
         return;
     }
-
-    ActionPalette palette(available, this);
-    if (palette.exec() != QDialog::Accepted) return;
-    Action *action = palette.chosenAction();
-    if (!action) return;
-
-    if (!action->configure(this, defaultOutputDirFor(action))) return;
 
     const QStringList outputs = action->apply(inputs);
     if (outputs.isEmpty()) {
         statusBar()->showMessage("Action produced no output", 5000);
-        return;
+    } else {
+        const QString outDir = QFileInfo(outputs.first()).absolutePath();
+        statusBar()->showMessage(
+            QString("Wrote %1 file(s) to %2").arg(outputs.size()).arg(outDir), 7000);
+        // Source dir contents may have changed (move took files away, in-place
+        // modes touched mtimes, etc.). Re-scan so the views match disk.
+        reload();
     }
-    const QString outDir = QFileInfo(outputs.first()).absolutePath();
-    statusBar()->showMessage(QString("Wrote %1 file(s) to %2").arg(outputs.size()).arg(outDir), 7000);
+    m_actionBar->resetState();
+    returnFocusToView();
+}
+
+void MainWindow::returnFocusToView() {
+    if (inThumbnailView()) m_thumbView->setFocus();
+    else                   m_imageView->setFocus();
+}
+
+void MainWindow::reload() {
+    if (m_sourceDir.isEmpty()) return;
+
+    const QString currentImagePath = m_imageView->currentPath();
+
+    m_files = listImagesInDir(m_sourceDir);
+    m_thumbView->setFiles(m_files);  // preserves selection by tooltip path
+    m_imageView->setFiles(m_files);
+
+    if (!currentImagePath.isEmpty()) {
+        const int idx = m_files.indexOf(currentImagePath);
+        if (idx >= 0) m_imageView->setIndex(idx);
+    }
+
+    statusBar()->showMessage(QString("Reloaded — %1 image(s)").arg(m_files.size()), 2500);
+    updateTitle();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
@@ -156,11 +204,20 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     const int origKey = ke->key();
     const auto origMods = ke->modifiers();
 
-    // Ctrl+P opens the action palette in either view. Checked before the
-    // vim-translation switch so plain `p` continues to mean "previous" in
-    // the image view.
-    if (origKey == Qt::Key_P && (origMods & Qt::ControlModifier)) {
-        openActionPalette();
+    // F5 reloads from any context (including while typing in the action bar).
+    if (origKey == Qt::Key_F5) {
+        reload();
+        return true;
+    }
+
+    // While the user is typing in the action bar's search field, leave the
+    // event alone — no vim translation, no view shortcuts (so `:` types
+    // a colon into the field instead of re-focusing it).
+    if (m_actionBar->isInputFocused()) return false;
+
+    // ':' (vim-style command activation) focuses the action bar from any view.
+    if (origKey == Qt::Key_Colon) {
+        m_actionBar->focusInput();
         return true;
     }
 

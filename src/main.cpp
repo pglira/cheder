@@ -1,33 +1,14 @@
+#include "imagedir.h"
 #include "mainwindow.h"
 
 #include <QApplication>
-#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QImageReader>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStringList>
 
 namespace {
-
-QStringList supportedExtensionGlobs() {
-    QStringList globs;
-    for (const QByteArray &fmt : QImageReader::supportedImageFormats())
-        globs << "*." + QString::fromLatin1(fmt).toLower();
-    return globs;
-}
-
-QStringList listImagesInDir(const QString &dir) {
-    QDir d(dir);
-    const QStringList names = d.entryList(supportedExtensionGlobs(),
-                                          QDir::Files | QDir::Readable,
-                                          QDir::Name | QDir::IgnoreCase);
-    QStringList absolute;
-    absolute.reserve(names.size());
-    for (const QString &n : names) absolute << d.absoluteFilePath(n);
-    return absolute;
-}
 
 bool promptForFileOrDir(QString *outFilePath, QString *outDirPath) {
     QMessageBox box;
@@ -39,7 +20,7 @@ bool promptForFileOrDir(QString *outFilePath, QString *outDirPath) {
     box.exec();
 
     if (box.clickedButton() == fileBtn) {
-        const QString filter = "Images (" + supportedExtensionGlobs().join(' ') + ")";
+        const QString filter = "Images (" + supportedImageGlobs().join(' ') + ")";
         const QString sel = QFileDialog::getOpenFileName(nullptr, "Open image", QString(), filter);
         if (sel.isEmpty()) return false;
         *outFilePath = sel;

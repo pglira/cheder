@@ -15,7 +15,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-bool ResizeAction::configure(QWidget *parent, const QString &defaultOutDir) {
+bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Resize");
 
@@ -53,8 +53,10 @@ bool ResizeAction::configure(QWidget *parent, const QString &defaultOutDir) {
     form->addRow("Output directory", outputDirField(outEdit, &dlg));
 
     auto *root = new QVBoxLayout(&dlg);
+    root->addWidget(makeInputsLabel(inputs.size(), &dlg));
     root->addLayout(form);
     root->addWidget(buttons);
+    styleActionDialog(dlg);
 
     if (dlg.exec() != QDialog::Accepted) return false;
 
