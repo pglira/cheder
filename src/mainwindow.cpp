@@ -1,42 +1,72 @@
 #include "mainwindow.h"
 
+#include "action.h"
+#include "actionpalette.h"
+#include "actionregistry.h"
 #include "imageview.h"
+#include "infopanel.h"
+#include "resizeaction.h"
+#include "rotateaction.h"
 #include "thumbnailview.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QEvent>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QListWidgetItem>
+#include <QSplitter>
 #include <QStackedWidget>
+#include <QStatusBar>
 
 #include <algorithm>
 
 MainWindow::MainWindow(const QStringList &files, QWidget *parent)
-    : QMainWindow(parent), m_files(files) {
+    : QMainWindow(parent), m_files(files), m_actions(std::make_unique<ActionRegistry>()) {
     m_stack = new QStackedWidget(this);
     setCentralWidget(m_stack);
 
     m_thumbView = new ThumbnailView(this);
     m_thumbView->setFiles(files);
 
+    m_infoPanel = new InfoPanel(m_thumbView->cache(), this);
+
+    m_thumbSplitter = new QSplitter(Qt::Horizontal, this);
+    m_thumbSplitter->addWidget(m_thumbView);
+    m_thumbSplitter->addWidget(m_infoPanel);
+    m_thumbSplitter->setStretchFactor(0, 1);
+    m_thumbSplitter->setStretchFactor(1, 0);
+    m_thumbSplitter->setCollapsible(0, false);
+    m_thumbSplitter->setSizes({800, 280});
+
     m_imageView = new ImageView(this);
     m_imageView->setFiles(files);
 
-    m_stack->addWidget(m_thumbView);
+    m_stack->addWidget(m_thumbSplitter);
     m_stack->addWidget(m_imageView);
+
+    statusBar();  // create the status bar so showMessage works
+
+    m_actions->add(std::make_unique<RotateAction>());
+    m_actions->add(std::make_unique<ResizeAction>());
 
     connect(m_thumbView, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *it) {
         showImage(m_thumbView->row(it));
     });
+    connect(m_thumbView, &QListWidget::currentItemChanged, this,
+            [this](QListWidgetItem *cur, QListWidgetItem *) {
+                m_infoPanel->showFile(cur ? cur->toolTip() : QString());
+            });
     connect(m_imageView, &ImageView::currentChanged, this, [this] { updateTitle(); });
 
     qApp->installEventFilter(this);
     updateTitle();
 }
 
+MainWindow::~MainWindow() = default;
+
 void MainWindow::showThumbnails() {
-    m_stack->setCurrentWidget(m_thumbView);
+    m_stack->setCurrentWidget(m_thumbSplitter);
     m_thumbView->setFocus();
     updateTitle();
 }
@@ -50,7 +80,7 @@ void MainWindow::showImage(int index) {
 }
 
 bool MainWindow::inThumbnailView() const {
-    return m_stack->currentWidget() == m_thumbView;
+    return m_stack->currentWidget() == m_thumbSplitter;
 }
 
 void MainWindow::updateTitle() {
@@ -67,6 +97,56 @@ void MainWindow::updateTitle() {
     setWindowTitle(QString("cheder (%1 images)").arg(m_files.size()));
 }
 
+QStringList MainWindow::currentInputs() const {
+    if (!inThumbnailView()) {
+        const QString p = m_imageView->currentPath();
+        return p.isEmpty() ? QStringList{} : QStringList{p};
+    }
+    QStringList paths;
+    for (auto *it : m_thumbView->selectedItems()) paths << it->toolTip();
+    if (paths.isEmpty()) {
+        if (auto *it = m_thumbView->currentItem()) paths << it->toolTip();
+    }
+    return paths;
+}
+
+QString MainWindow::defaultOutputDirFor(const Action *action) const {
+    const QStringList inputs = currentInputs();
+    QString srcDir;
+    if (!inputs.isEmpty()) srcDir = QFileInfo(inputs.first()).absolutePath();
+    else                   srcDir = QDir::currentPath();
+    return srcDir + '/' + action->id();
+}
+
+void MainWindow::openActionPalette() {
+    const QStringList inputs = currentInputs();
+    if (inputs.isEmpty()) {
+        statusBar()->showMessage("No image to act on", 3000);
+        return;
+    }
+
+    const QList<Action *> available = m_actions->acceptingCount(inputs.size());
+    if (available.isEmpty()) {
+        statusBar()->showMessage(QString("No actions accept %1 input(s)").arg(inputs.size()), 3000);
+        return;
+    }
+
+    ActionPalette palette(available, this);
+    if (palette.exec() != QDialog::Accepted) return;
+    Action *action = palette.chosenAction();
+    if (!action) return;
+
+    if (!action->configure(this, defaultOutputDirFor(action))) return;
+
+    const QStringList outputs = action->apply(inputs);
+    if (outputs.isEmpty()) {
+        statusBar()->showMessage("Action produced no output", 5000);
+        return;
+    }
+    const QString outDir = QFileInfo(outputs.first()).absolutePath();
+    statusBar()->showMessage(QString("Wrote %1 file(s) to %2").arg(outputs.size()).arg(outDir), 7000);
+}
+
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     Q_UNUSED(obj);
     if (m_translating) return false;
@@ -75,6 +155,14 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     auto *ke = static_cast<QKeyEvent *>(event);
     const int origKey = ke->key();
     const auto origMods = ke->modifiers();
+
+    // Ctrl+P opens the action palette in either view. Checked before the
+    // vim-translation switch so plain `p` continues to mean "previous" in
+    // the image view.
+    if (origKey == Qt::Key_P && (origMods & Qt::ControlModifier)) {
+        openActionPalette();
+        return true;
+    }
 
     // "gg" sequence: lowercase g pressed twice -> Home
     if (origKey == Qt::Key_G && !(origMods & Qt::ShiftModifier)) {
@@ -138,6 +226,9 @@ bool MainWindow::handleKeyInThumbnails(int key) {
         return true;
     case Qt::Key_Minus:
         m_thumbView->zoomOut();
+        return true;
+    case Qt::Key_I:
+        m_infoPanel->setVisible(!m_infoPanel->isVisible());
         return true;
     }
     return false;

@@ -4,9 +4,11 @@
 
 #include <QFileInfo>
 #include <QIcon>
+#include <QPainter>
 #include <QPixmap>
 #include <QSet>
 #include <QTimer>
+#include <QWheelEvent>
 
 #include <algorithm>
 
@@ -16,8 +18,8 @@ constexpr int kDefaultThumbSize = 128;
 constexpr int kThumbSizeStep    = 32;
 constexpr int kThumbSizeMin     = 64;
 constexpr int kThumbSizeMax     = 512;
-constexpr int kGridPaddingW     = 32;
-constexpr int kGridPaddingH     = 52;
+constexpr int kGridPaddingW     = 8;
+constexpr int kGridPaddingH     = 8;
 
 const QColor kPlaceholderColor(40, 40, 40);
 
@@ -66,6 +68,17 @@ void ThumbnailView::setThumbnailSize(int size) {
 void ThumbnailView::zoomIn()  { setThumbnailSize(thumbnailSize() + kThumbSizeStep); }
 void ThumbnailView::zoomOut() { setThumbnailSize(thumbnailSize() - kThumbSizeStep); }
 
+void ThumbnailView::wheelEvent(QWheelEvent *event) {
+    if (event->modifiers() & Qt::ControlModifier) {
+        const int dy = event->angleDelta().y();
+        if (dy > 0)      zoomIn();
+        else if (dy < 0) zoomOut();
+        event->accept();
+        return;
+    }
+    QListWidget::wheelEvent(event);
+}
+
 void ThumbnailView::setFiles(const QStringList &files) {
     m_files = files;
     rebuildItems();
@@ -89,9 +102,8 @@ void ThumbnailView::rebuildItems() {
     clear();
     const QPixmap placeholder = placeholderPixmap(iconSize());
     for (const QString &path : m_files) {
-        auto *item = new QListWidgetItem(QIcon(placeholder), QFileInfo(path).fileName(), this);
+        auto *item = new QListWidgetItem(QIcon(placeholder), QString(), this);
         item->setToolTip(path);
-        item->setTextAlignment(Qt::AlignHCenter | Qt::AlignTop);
         item->setSizeHint(gridSize());
         if (previouslySelected.contains(path)) item->setSelected(true);
     }
@@ -111,9 +123,18 @@ void ThumbnailView::loadNext(qint64 generation) {
     if (m_loadIndex >= m_files.size()) return;
 
     const int row = m_loadIndex++;
-    const QPixmap pm = m_cache->getThumbnail(m_files.at(row), iconSize());
-    if (generation == m_generation && !pm.isNull()) {
-        if (auto *it = item(row)) it->setIcon(QIcon(pm));
+    const QPixmap raw = m_cache->getThumbnail(m_files.at(row), iconSize());
+    if (generation == m_generation && !raw.isNull()) {
+        // Pad to a square iconSize pixmap so every cell is the same size and
+        // the icon area in QListView paints predictably.
+        QPixmap padded(iconSize());
+        padded.setDevicePixelRatio(1.0);
+        padded.fill(kPlaceholderColor);
+        QPainter p(&padded);
+        p.drawPixmap((iconSize().width()  - raw.width())  / 2,
+                     (iconSize().height() - raw.height()) / 2, raw);
+        p.end();
+        if (auto *it = item(row)) it->setIcon(QIcon(padded));
     }
 
     QTimer::singleShot(0, this, [this, generation] { loadNext(generation); });

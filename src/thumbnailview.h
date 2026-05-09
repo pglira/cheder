@@ -21,6 +21,13 @@ public:
     void zoomIn();
     void zoomOut();
 
+    // Exposed so peer widgets (e.g. InfoPanel) can render previews using the
+    // same disk cache instead of duplicating one.
+    ThumbnailCache *cache() const { return m_cache.get(); }
+
+protected:
+    void wheelEvent(QWheelEvent *event) override;
+
 private:
     void rebuildItems();
     void startLoading();
