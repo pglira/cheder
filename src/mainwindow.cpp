@@ -213,16 +213,17 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         return true;
     }
 
-    // While the user is typing in the action bar's search field, leave the
-    // event alone — no vim translation, no view shortcuts (so `:` types
-    // a colon into the field instead of re-focusing it).
-    if (m_actionPane->isInputFocused()) return false;
-
-    // ':' (vim-style command activation) focuses the action bar from any view.
-    if (origKey == Qt::Key_Colon) {
+    // Ctrl+P focuses the action bar from any view. Handled before the
+    // input-focused guard so it also re-selects the field when already
+    // focused (harmless no-op visually).
+    if (origKey == Qt::Key_P && (origMods & Qt::ControlModifier)) {
         m_actionPane->focusInput();
         return true;
     }
+
+    // While the user is typing in the action bar's search field, leave the
+    // event alone — no vim translation, no view shortcuts.
+    if (m_actionPane->isInputFocused()) return false;
 
     // "gg" sequence: lowercase g pressed twice -> Home
     if (origKey == Qt::Key_G && !(origMods & Qt::ShiftModifier)) {

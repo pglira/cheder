@@ -20,7 +20,7 @@ ActionBar::ActionBar(ActionRegistry *registry, QWidget *parent)
     m_list->setFocusPolicy(Qt::NoFocus);  // keep keyboard focus on the input
 
     m_input = new QLineEdit(this);
-    m_input->setPlaceholderText("Type to filter actions — Enter runs, Esc/Tab dismisses (':' to focus)");
+    m_input->setPlaceholderText("Type to filter actions — Enter runs, Esc/Tab dismisses (Ctrl+P to focus)");
     m_input->installEventFilter(this);
 
     auto *layout = new QVBoxLayout(this);
