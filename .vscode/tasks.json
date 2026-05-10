@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cheder: configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["-S", ".", "-B", "build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "cheder: build",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "-j"],
+            "dependsOn": "cheder: configure",
+            "group": "build",
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "cheder: build + install",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--install", "build", "--prefix", "${env:HOME}/.local"],
+            "dependsOn": "cheder: build",
+            "dependsOrder": "sequence",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "Configure, build, and install to ~/.local/bin/cheder"
+        }
+    ]
+}

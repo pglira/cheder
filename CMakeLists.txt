@@ -41,3 +41,6 @@ add_executable(cheder
     src/actions/rotateaction.h
 )
 target_link_libraries(cheder PRIVATE Qt6::Widgets)
+
+include(GNUInstallDirs)
+install(TARGETS cheder RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
