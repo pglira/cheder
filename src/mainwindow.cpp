@@ -271,6 +271,14 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     // event alone — no vim translation, no view shortcuts.
     if (m_actionPane->isInputFocused()) return false;
 
+    // 'q' (or Shift+Q) closes the window from either view; placed after the
+    // input-focused guard so typing 'q' into the filter just types a letter.
+    if (origKey == Qt::Key_Q
+        && !(origMods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
+        close();
+        return true;
+    }
+
     // "gg" sequence: lowercase g pressed twice -> Home
     if (origKey == Qt::Key_G && !(origMods & Qt::ShiftModifier)) {
         if (!m_pendingG) {
