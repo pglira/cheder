@@ -90,6 +90,19 @@ MainWindow::~MainWindow() = default;
 
 void MainWindow::showThumbnails() {
     m_stack->setCurrentWidget(m_thumbSplitter);
+    // Sync the thumbnail cursor to the image we were viewing. If nothing's
+    // selected yet (e.g. launched on a single file), select that image too;
+    // otherwise just move the keyboard cursor without disturbing an existing
+    // multi-selection.
+    if (m_thumbView->count() > 0) {
+        const int idx = m_imageView->index();
+        if (idx >= 0 && idx < m_thumbView->count()) {
+            const auto cmd = m_thumbView->selectedItems().isEmpty()
+                ? QItemSelectionModel::ClearAndSelect
+                : QItemSelectionModel::NoUpdate;
+            m_thumbView->setCurrentRow(idx, cmd);
+        }
+    }
     m_thumbView->setFocus();
     updateTitle();
 }
