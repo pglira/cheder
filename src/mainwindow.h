@@ -37,6 +37,7 @@ private:
     QStringList currentInputs() const;
     QString defaultOutputDirFor(const Action *action) const;
     void runAction(Action *action);
+    void deleteCurrentInputs();
     void returnFocusToView();
 
     QStackedWidget *m_stack;

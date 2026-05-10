@@ -15,9 +15,11 @@
 #include <QApplication>
 #include <QDir>
 #include <QEvent>
+#include <QFile>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QListWidgetItem>
+#include <QMessageBox>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -173,6 +175,51 @@ void MainWindow::runAction(Action *action) {
     returnFocusToView();
 }
 
+void MainWindow::deleteCurrentInputs() {
+    const QStringList inputs = currentInputs();
+    if (inputs.isEmpty()) {
+        statusBar()->showMessage("Nothing to delete", 3000);
+        return;
+    }
+
+    QString detail;
+    const int sampleMax = 5;
+    for (int i = 0; i < std::min<int>(inputs.size(), sampleMax); ++i)
+        detail += "  " + QFileInfo(inputs[i]).fileName() + "\n";
+    if (inputs.size() > sampleMax)
+        detail += QString("  ... and %1 more\n").arg(inputs.size() - sampleMax);
+
+    QMessageBox box(this);
+    box.setWindowTitle("Delete images");
+    box.setIcon(QMessageBox::Warning);
+    box.setText(QString("Move %1 image%2 to trash?")
+                    .arg(inputs.size()).arg(inputs.size() == 1 ? "" : "s"));
+    box.setInformativeText(detail);
+    box.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    box.setDefaultButton(QMessageBox::No);
+    if (box.exec() != QMessageBox::Yes) return;
+
+    auto *logger = m_actionPane->logger();
+    if (logger) logger->info(QString("[delete] start — %1 input(s)").arg(inputs.size()));
+
+    int trashed = 0, failed = 0;
+    for (const QString &p : inputs) {
+        if (QFile::moveToTrash(p)) {
+            ++trashed;
+            if (logger) logger->info(QString("trashed %1").arg(p));
+        } else {
+            ++failed;
+            if (logger) logger->error(QString("failed to trash %1").arg(p));
+        }
+    }
+    if (logger) logger->info(QString("[delete] done — trashed %1, failed %2")
+                                 .arg(trashed).arg(failed));
+
+    statusBar()->showMessage(
+        QString("Trashed %1 of %2 image(s)").arg(trashed).arg(inputs.size()), 5000);
+    reload();
+}
+
 void MainWindow::returnFocusToView() {
     if (inThumbnailView()) m_thumbView->setFocus();
     else                   m_imageView->setFocus();
@@ -291,6 +338,9 @@ bool MainWindow::handleKeyInThumbnails(int key) {
     case Qt::Key_I:
         m_infoPanel->setVisible(!m_infoPanel->isVisible());
         return true;
+    case Qt::Key_Delete:
+        deleteCurrentInputs();
+        return true;
     }
     return false;
 }
@@ -309,6 +359,9 @@ bool MainWindow::handleKeyInImage(int key) {
     case Qt::Key_Left:
     case Qt::Key_P:
         m_imageView->previous();
+        return true;
+    case Qt::Key_Delete:
+        deleteCurrentInputs();
         return true;
     }
     return false;
