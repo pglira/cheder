@@ -20,7 +20,7 @@ ActionBar::ActionBar(ActionRegistry *registry, QWidget *parent)
     m_list->setFocusPolicy(Qt::NoFocus);  // keep keyboard focus on the input
 
     m_input = new QLineEdit(this);
-    m_input->setPlaceholderText("Type to filter actions — Enter runs, Esc/Tab dismisses (Ctrl+P to focus)");
+    m_input->setPlaceholderText("Filter actions — Enter runs, Esc/Tab dismisses (Ctrl+P to focus)");
     m_input->installEventFilter(this);
 
     auto *layout = new QVBoxLayout(this);
@@ -39,7 +39,8 @@ void ActionBar::focusInput() {
 }
 
 void ActionBar::resetState() {
-    m_input->clear();   // triggers onTextChanged -> hides list
+    m_input->clear();
+    m_list->setVisible(false);  // explicit: input may still hold focus here
 }
 
 bool ActionBar::isInputFocused() const {
@@ -48,18 +49,21 @@ bool ActionBar::isInputFocused() const {
 
 void ActionBar::onTextChanged(const QString &text) {
     rebuildList(text);
-    m_list->setVisible(m_list->count() > 0);
+    // Only show while the input has focus; clearing the field after running
+    // an action would otherwise repopulate the list mid-dismissal.
+    m_list->setVisible(m_input->hasFocus() && m_list->count() > 0);
 }
 
 void ActionBar::rebuildList(const QString &filter) {
     m_list->clear();
     const QString needle = filter.trimmed().toLower();
-    if (needle.isEmpty()) return;
     for (Action *a : m_registry->all()) {
-        const bool hit = a->name().toLower().contains(needle)
-                      || a->id().toLower().contains(needle)
-                      || a->description().toLower().contains(needle);
-        if (!hit) continue;
+        if (!needle.isEmpty()) {
+            const bool hit = a->name().toLower().contains(needle)
+                          || a->id().toLower().contains(needle)
+                          || a->description().toLower().contains(needle);
+            if (!hit) continue;
+        }
         const QString label = a->description().isEmpty()
                                   ? a->name()
                                   : a->name() + " — " + a->description();
@@ -77,7 +81,18 @@ void ActionBar::invokeCurrent() {
 }
 
 bool ActionBar::eventFilter(QObject *obj, QEvent *event) {
-    if (obj != m_input || event->type() != QEvent::KeyPress)
+    if (obj != m_input) return QWidget::eventFilter(obj, event);
+
+    if (event->type() == QEvent::FocusIn) {
+        rebuildList(m_input->text());
+        m_list->setVisible(m_list->count() > 0);
+        return false;
+    }
+    if (event->type() == QEvent::FocusOut) {
+        m_list->setVisible(false);
+        return false;
+    }
+    if (event->type() != QEvent::KeyPress)
         return QWidget::eventFilter(obj, event);
 
     auto *ke = static_cast<QKeyEvent *>(event);
