@@ -41,10 +41,10 @@ private:
     void returnFocusToView();
 
     QStackedWidget *m_stack;
-    QSplitter *m_thumbSplitter;
     ThumbnailView *m_thumbView;
-    InfoPanel *m_infoPanel;
+    QSplitter *m_imageSplitter;
     ImageView *m_imageView;
+    InfoPanel *m_infoPanel;
     ActionPane *m_actionPane;
     QStringList m_files;
     QString m_sourceDir;

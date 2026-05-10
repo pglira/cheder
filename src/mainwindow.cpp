@@ -37,21 +37,22 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     m_thumbView = new ThumbnailView(this);
     m_thumbView->setFiles(files);
 
-    m_infoPanel = new InfoPanel(m_thumbView->cache(), this);
-
-    m_thumbSplitter = new QSplitter(Qt::Horizontal, this);
-    m_thumbSplitter->addWidget(m_thumbView);
-    m_thumbSplitter->addWidget(m_infoPanel);
-    m_thumbSplitter->setStretchFactor(0, 1);
-    m_thumbSplitter->setStretchFactor(1, 0);
-    m_thumbSplitter->setCollapsible(0, false);
-    m_thumbSplitter->setSizes({800, 280});
-
     m_imageView = new ImageView(this);
     m_imageView->setFiles(files);
 
-    m_stack->addWidget(m_thumbSplitter);
-    m_stack->addWidget(m_imageView);
+    m_infoPanel = new InfoPanel(m_thumbView->cache(), this);
+    m_infoPanel->hide();  // off by default; toggle with `i` while in image view
+
+    m_imageSplitter = new QSplitter(Qt::Horizontal, this);
+    m_imageSplitter->addWidget(m_imageView);
+    m_imageSplitter->addWidget(m_infoPanel);
+    m_imageSplitter->setStretchFactor(0, 1);
+    m_imageSplitter->setStretchFactor(1, 0);
+    m_imageSplitter->setCollapsible(0, false);
+    m_imageSplitter->setSizes({900, 300});
+
+    m_stack->addWidget(m_thumbView);
+    m_stack->addWidget(m_imageSplitter);
 
     statusBar();  // ensures the bar exists for later showMessage() calls
 
@@ -76,11 +77,13 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     connect(m_thumbView, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *it) {
         showImage(m_thumbView->row(it));
     });
-    connect(m_thumbView, &QListWidget::currentItemChanged, this,
-            [this](QListWidgetItem *cur, QListWidgetItem *) {
-                m_infoPanel->showFile(cur ? cur->toolTip() : QString());
+    connect(m_imageView, &ImageView::currentChanged, this,
+            [this](int, const QString &path) {
+                updateTitle();
+                // Skip the (potentially exiftool-spawning) refresh if the panel
+                // is hidden; the next `i` toggle will load it on demand.
+                if (m_infoPanel->isVisible()) m_infoPanel->showFile(path);
             });
-    connect(m_imageView, &ImageView::currentChanged, this, [this] { updateTitle(); });
 
     qApp->installEventFilter(this);
     updateTitle();
@@ -89,7 +92,7 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
 MainWindow::~MainWindow() = default;
 
 void MainWindow::showThumbnails() {
-    m_stack->setCurrentWidget(m_thumbSplitter);
+    m_stack->setCurrentWidget(m_thumbView);
     // Sync the thumbnail cursor to the image we were viewing. If nothing's
     // selected yet (e.g. launched on a single file), select that image too;
     // otherwise just move the keyboard cursor without disturbing an existing
@@ -109,14 +112,18 @@ void MainWindow::showThumbnails() {
 
 void MainWindow::showImage(int index) {
     if (m_files.isEmpty()) return;
+    // Switch the stack first so the info panel is on-screen when setIndex()
+    // emits currentChanged — otherwise the visibility-gated refresh sees a
+    // hidden panel and the panel ends up with stale data from the previous
+    // image.
+    m_stack->setCurrentWidget(m_imageSplitter);
     m_imageView->setIndex(std::clamp<int>(index, 0, static_cast<int>(m_files.size()) - 1));
-    m_stack->setCurrentWidget(m_imageView);
     m_imageView->setFocus();
     updateTitle();
 }
 
 bool MainWindow::inThumbnailView() const {
-    return m_stack->currentWidget() == m_thumbSplitter;
+    return m_stack->currentWidget() == m_thumbView;
 }
 
 void MainWindow::updateTitle() {
@@ -357,9 +364,6 @@ bool MainWindow::handleKeyInThumbnails(int key) {
     case Qt::Key_Minus:
         m_thumbView->zoomOut();
         return true;
-    case Qt::Key_I:
-        m_infoPanel->setVisible(!m_infoPanel->isVisible());
-        return true;
     case Qt::Key_Delete:
         deleteCurrentInputs();
         return true;
@@ -381,6 +385,13 @@ bool MainWindow::handleKeyInImage(int key) {
     case Qt::Key_Left:
     case Qt::Key_P:
         m_imageView->previous();
+        return true;
+    case Qt::Key_I:
+        m_infoPanel->setVisible(!m_infoPanel->isVisible());
+        // Hidden -> shown: panel may be stale (we skipped updates while hidden).
+        // Refresh against the current image so it lights up immediately.
+        if (m_infoPanel->isVisible())
+            m_infoPanel->showFile(m_imageView->currentPath());
         return true;
     case Qt::Key_Delete:
         deleteCurrentInputs();
