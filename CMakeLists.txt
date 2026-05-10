@@ -31,6 +31,8 @@ add_executable(cheder
     src/actions/actionregistry.cpp
     src/actions/actionregistry.h
     src/actions/actionwidgets.h
+    src/actions/captionaction.cpp
+    src/actions/captionaction.h
     src/actions/copymoveaction.cpp
     src/actions/copymoveaction.h
     src/actions/resizeaction.cpp
