@@ -26,6 +26,8 @@ add_executable(cheder
     src/actions/actionbar.cpp
     src/actions/actionbar.h
     src/actions/actionlogger.h
+    src/actions/actionpane.cpp
+    src/actions/actionpane.h
     src/actions/actionregistry.cpp
     src/actions/actionregistry.h
     src/actions/actionwidgets.h

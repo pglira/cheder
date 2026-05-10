@@ -11,7 +11,7 @@ class ThumbnailView;
 class InfoPanel;
 class ImageView;
 class Action;
-class ActionBar;
+class ActionPane;
 class ActionRegistry;
 
 class MainWindow : public QMainWindow {
@@ -44,7 +44,7 @@ private:
     ThumbnailView *m_thumbView;
     InfoPanel *m_infoPanel;
     ImageView *m_imageView;
-    ActionBar *m_actionBar;
+    ActionPane *m_actionPane;
     QStringList m_files;
     QString m_sourceDir;
     std::unique_ptr<ActionRegistry> m_actions;

@@ -1,7 +1,8 @@
 #include "mainwindow.h"
 
 #include "actions/action.h"
-#include "actions/actionbar.h"
+#include "actions/actionlogger.h"
+#include "actions/actionpane.h"
 #include "actions/actionregistry.h"
 #include "actions/copymoveaction.h"
 #include "actions/resizeaction.h"
@@ -55,18 +56,18 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     m_actions->add(std::make_unique<ResizeAction>());
     m_actions->add(std::make_unique<CopyMoveAction>());
 
-    m_actionBar = new ActionBar(m_actions.get(), this);
+    m_actionPane = new ActionPane(m_actions.get(), this);
 
     auto *centralContainer = new QWidget(this);
     auto *vlay = new QVBoxLayout(centralContainer);
     vlay->setContentsMargins(0, 0, 0, 0);
     vlay->setSpacing(0);
     vlay->addWidget(m_stack, 1);
-    vlay->addWidget(m_actionBar);
+    vlay->addWidget(m_actionPane);
     setCentralWidget(centralContainer);
 
-    connect(m_actionBar, &ActionBar::actionInvoked, this, &MainWindow::runAction);
-    connect(m_actionBar, &ActionBar::exitRequested, this, &MainWindow::returnFocusToView);
+    connect(m_actionPane, &ActionPane::actionInvoked, this, &MainWindow::runAction);
+    connect(m_actionPane, &ActionPane::exitRequested, this, &MainWindow::returnFocusToView);
 
     connect(m_thumbView, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *it) {
         showImage(m_thumbView->row(it));
@@ -141,7 +142,7 @@ void MainWindow::runAction(Action *action) {
     const QStringList inputs = currentInputs();
     if (inputs.isEmpty()) {
         statusBar()->showMessage("No image to act on", 3000);
-        m_actionBar->resetState();
+        m_actionPane->resetState();
         returnFocusToView();
         return;
     }
@@ -152,12 +153,12 @@ void MainWindow::runAction(Action *action) {
     }
 
     if (!action->configure(this, inputs, defaultOutputDirFor(action))) {
-        m_actionBar->resetState();
+        m_actionPane->resetState();
         returnFocusToView();
         return;
     }
 
-    const QStringList outputs = action->apply(inputs, nullptr);
+    const QStringList outputs = action->apply(inputs, m_actionPane->logger());
     if (outputs.isEmpty()) {
         statusBar()->showMessage("Action produced no output", 5000);
     } else {
@@ -168,7 +169,7 @@ void MainWindow::runAction(Action *action) {
         // re-scan so the views match disk.
         reload();
     }
-    m_actionBar->resetState();
+    m_actionPane->resetState();
     returnFocusToView();
 }
 
@@ -215,11 +216,11 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     // While the user is typing in the action bar's search field, leave the
     // event alone — no vim translation, no view shortcuts (so `:` types
     // a colon into the field instead of re-focusing it).
-    if (m_actionBar->isInputFocused()) return false;
+    if (m_actionPane->isInputFocused()) return false;
 
     // ':' (vim-style command activation) focuses the action bar from any view.
     if (origKey == Qt::Key_Colon) {
-        m_actionBar->focusInput();
+        m_actionPane->focusInput();
         return true;
     }
 
