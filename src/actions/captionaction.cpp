@@ -5,18 +5,52 @@
 #include <QFont>
 #include <QFontComboBox>
 #include <QFontMetrics>
+#include <QFrame>
 #include <QImage>
 #include <QImageReader>
 #include <QImageWriter>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QPixmap>
+#include <QResizeEvent>
 #include <QSpinBox>
+
+namespace {
+
+// QLabel that holds a source QImage and renders it scaled-to-fit on every
+// resize. Lets the action dialog grow/shrink without clipping the pixmap.
+class PreviewLabel : public QLabel {
+public:
+    using QLabel::QLabel;
+    void setSource(const QImage &img) { m_src = img; updateScaled(); }
+
+protected:
+    void resizeEvent(QResizeEvent *e) override {
+        QLabel::resizeEvent(e);
+        updateScaled();
+    }
+
+private:
+    void updateScaled() {
+        if (m_src.isNull()) return;
+        const QSize box = size();
+        if (box.width() <= 0 || box.height() <= 0) return;
+        QImage scaled = m_src.scaled(box, Qt::KeepAspectRatio,
+                                     Qt::SmoothTransformation);
+        setPixmap(QPixmap::fromImage(scaled));
+    }
+
+    QImage m_src;
+};
+
+}  // namespace
 
 bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Caption");
 
-    auto shell = beginActionDialog(&dlg, inputs);
+    auto shell = beginActionDialog(&dlg, inputs, /*resizable=*/true);
 
     auto *captionEdit = new QLineEdit(m_caption, &dlg);
     captionEdit->setPlaceholderText("Caption text (required)");
@@ -52,6 +86,51 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     shell.form->addRow("Font",       fontBox);
     shell.form->addRow("Size",       sizeSpin);
 
+    QImage srcOrig;
+    if (!inputs.isEmpty()) {
+        QImageReader reader(inputs.first());
+        reader.setAutoTransform(true);
+        srcOrig = reader.read();
+    }
+
+    auto *previewLabel = new PreviewLabel(&dlg);
+    previewLabel->setAlignment(Qt::AlignCenter);
+    previewLabel->setMinimumSize(320, 220);
+    previewLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    previewLabel->setFrameShape(QFrame::StyledPanel);
+    if (srcOrig.isNull())
+        previewLabel->setText("(preview unavailable)");
+    shell.form->addRow(previewLabel);
+
+    // Render at the source's full resolution with the configured pointSize.
+    // Display-time scaling is delegated to PreviewLabel, which fits the
+    // result into whatever space the user has resized the label to —
+    // identical renderCaptioned() inputs to applyOne(), no clipping.
+    auto updatePreview = [=]() {
+        if (srcOrig.isNull()) return;
+        const QString caption = captionEdit->text();
+        QImage out;
+        if (caption.isEmpty()) {
+            out = srcOrig;
+        } else {
+            const Position pos = static_cast<Position>(positionBox->currentData().toInt());
+            const Bg bgv       = static_cast<Bg>(bgBox->currentData().toInt());
+            const Fg fgv       = static_cast<Fg>(fgBox->currentData().toInt());
+            const QString fam  = fontBox->currentFont().family();
+            const int sz       = sizeSpin->value();
+            out = renderCaptioned(srcOrig, caption, pos, bgv, fgv, fam, sz);
+        }
+        previewLabel->setSource(out);
+    };
+
+    QObject::connect(captionEdit, &QLineEdit::textChanged,         &dlg, updatePreview);
+    QObject::connect(positionBox, &QComboBox::currentIndexChanged, &dlg, updatePreview);
+    QObject::connect(bgBox,       &QComboBox::currentIndexChanged, &dlg, updatePreview);
+    QObject::connect(fgBox,       &QComboBox::currentIndexChanged, &dlg, updatePreview);
+    QObject::connect(fontBox,     &QFontComboBox::currentFontChanged, &dlg, updatePreview);
+    QObject::connect(sizeSpin,    &QSpinBox::valueChanged,         &dlg, updatePreview);
+    updatePreview();
+
     finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
@@ -70,32 +149,30 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     return true;
 }
 
-QString CaptionAction::applyOne(const QString &input, ActionLogger *logger) {
-    QImageReader reader(input);
-    reader.setAutoTransform(true);
-    QImage src = reader.read();
-    if (src.isNull()) return {};
+QImage CaptionAction::renderCaptioned(const QImage &src,
+                                      const QString &caption,
+                                      Position position,
+                                      Bg bg, Fg fg,
+                                      const QString &fontFamily,
+                                      int pointSize) {
+    QFont font(fontFamily.isEmpty() ? QFont().family() : fontFamily);
+    font.setPointSize(pointSize);
 
-    QFont font(m_fontFamily.isEmpty() ? QFont().family() : m_fontFamily);
-    font.setPointSize(m_pointSize);
-
-    // Measure the wrapped caption against the source width so the strip
-    // grows for long captions instead of clipping.
-    const int margin = std::max(8, m_pointSize / 2);
+    const int margin = std::max(8, pointSize / 2);
     const QFontMetrics fm(font);
     const QRect textBound = fm.boundingRect(
         QRect(0, 0, std::max(1, src.width() - 2 * margin), 1'000'000),
-        Qt::AlignHCenter | Qt::TextWordWrap, m_caption);
+        Qt::AlignHCenter | Qt::TextWordWrap, caption);
     const int stripHeight = textBound.height() + margin * 2;
 
     QColor bgColor;
     bool transparent = false;
-    switch (m_bg) {
+    switch (bg) {
     case Bg::White:       bgColor = Qt::white;       break;
     case Bg::Black:       bgColor = Qt::black;       break;
     case Bg::Transparent: bgColor = Qt::transparent; transparent = true; break;
     }
-    const QColor fgColor = (m_fg == Fg::White) ? Qt::white : Qt::black;
+    const QColor fgColor = (fg == Fg::White) ? Qt::white : Qt::black;
 
     const QImage::Format fmt = (transparent || src.hasAlphaChannel())
         ? QImage::Format_ARGB32_Premultiplied
@@ -104,8 +181,8 @@ QString CaptionAction::applyOne(const QString &input, ActionLogger *logger) {
     QImage out(src.width(), src.height() + stripHeight, fmt);
     out.fill(transparent ? QColor(0, 0, 0, 0) : bgColor);
 
-    const int imgY   = (m_position == Position::Top) ? stripHeight : 0;
-    const int stripY = (m_position == Position::Top) ? 0 : src.height();
+    const int imgY   = (position == Position::Top) ? stripHeight : 0;
+    const int stripY = (position == Position::Top) ? 0 : src.height();
 
     QPainter p(&out);
     p.setRenderHint(QPainter::Antialiasing, true);
@@ -114,8 +191,19 @@ QString CaptionAction::applyOne(const QString &input, ActionLogger *logger) {
     p.setFont(font);
     p.setPen(fgColor);
     p.drawText(QRect(margin, stripY, src.width() - 2 * margin, stripHeight),
-               Qt::AlignCenter | Qt::TextWordWrap, m_caption);
+               Qt::AlignCenter | Qt::TextWordWrap, caption);
     p.end();
+    return out;
+}
+
+QString CaptionAction::applyOne(const QString &input, ActionLogger *logger) {
+    QImageReader reader(input);
+    reader.setAutoTransform(true);
+    QImage src = reader.read();
+    if (src.isNull()) return {};
+
+    const QImage out = renderCaptioned(src, m_caption, m_position, m_bg, m_fg,
+                                       m_fontFamily, m_pointSize);
 
     return writeOne(input, logger, [&](const QString &temp) {
         return QImageWriter(temp).write(out);

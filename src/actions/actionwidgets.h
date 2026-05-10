@@ -69,10 +69,31 @@ struct ActionDialogShell {
     QComboBox   *overwriteBox = nullptr;  // populated by finishActionDialog
 };
 
-inline ActionDialogShell beginActionDialog(QDialog *dlg, const QStringList &inputs) {
+// Plain parameter dialogs (Resize, Rotate, CopyMove) have no preview and
+// nothing that benefits from extra space, so default to a fixed-size frame.
+// Pass `resizable = true` for dialogs that *do* benefit from growing —
+// e.g. CaptionAction's preview pane.
+inline ActionDialogShell beginActionDialog(QDialog *dlg, const QStringList &inputs,
+                                           bool resizable = false) {
     styleActionDialog(*dlg);
+
+    if (resizable) {
+        dlg->setWindowFlags(dlg->windowFlags()
+                            | Qt::WindowMinimizeButtonHint
+                            | Qt::WindowMaximizeButtonHint);
+        dlg->setSizeGripEnabled(true);
+    }
+
     auto *root = new QVBoxLayout(dlg);
-    root->addWidget(makeInputsLabel(inputs.size(), dlg));
+    if (!resizable)
+        root->setSizeConstraint(QLayout::SetFixedSize);
+
+    // Pin the opening width via a min on the header label rather than the
+    // dialog itself — that way it flows through the layout's sizeHint and
+    // SetFixedSize honors it for non-resizable dialogs.
+    auto *header = makeInputsLabel(inputs.size(), dlg);
+    header->setMinimumWidth(kActionDialogMinWidth);
+    root->addWidget(header);
 
     ActionDialogShell shell;
     shell.form = new QFormLayout;

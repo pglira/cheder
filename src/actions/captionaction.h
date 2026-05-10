@@ -2,6 +2,8 @@
 
 #include "action.h"
 
+#include <QImage>
+
 class CaptionAction : public BatchAction {
 public:
     QString id() const override          { return "caption"; }
@@ -22,6 +24,16 @@ private:
     enum class Position { Bottom, Top };
     enum class Bg       { White, Black, Transparent };
     enum class Fg       { Black, White };
+
+    // Pure render: the configure() preview and applyOne() invoke this with
+    // identical arguments (the dialog only scales the resulting image at
+    // display time), so the preview is byte-faithful to what gets written.
+    static QImage renderCaptioned(const QImage &src,
+                                  const QString &caption,
+                                  Position position,
+                                  Bg bg, Fg fg,
+                                  const QString &fontFamily,
+                                  int pointSize);
 
     QString  m_caption;
     Position m_position  = Position::Bottom;
