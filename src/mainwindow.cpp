@@ -40,7 +40,7 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     m_imageView = new ImageView(this);
     m_imageView->setFiles(files);
 
-    m_infoPanel = new InfoPanel(m_thumbView->cache(), this);
+    m_infoPanel = new InfoPanel(this);
     m_infoPanel->hide();  // off by default; toggle with `i` while in image view
 
     m_imageSplitter = new QSplitter(Qt::Horizontal, this);

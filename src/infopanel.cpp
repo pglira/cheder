@@ -1,26 +1,20 @@
 #include "infopanel.h"
 
-#include "thumbnailcache.h"
-
 #include <QDateTime>
 #include <QFileInfo>
 #include <QFormLayout>
-#include <QFrame>
 #include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLocale>
-#include <QPixmap>
 #include <QProcess>
-#include <QResizeEvent>
 #include <QVBoxLayout>
 
 namespace {
 
-constexpr int kThumbMaxSize = 512;   // matches ThumbnailCache canonical size
-constexpr int kPanelMargin  = 8;
+constexpr int kPanelMargin = 8;
 
 QString formatBytes(qint64 bytes) {
     return QLocale::system().formattedDataSize(bytes, 1, QLocale::DataSizeTraditionalFormat);
@@ -37,21 +31,10 @@ QString jsonField(const QJsonObject &obj, const char *key) {
 
 }  // namespace
 
-InfoPanel::InfoPanel(ThumbnailCache *cache, QWidget *parent)
-    : QWidget(parent), m_cache(cache) {
+InfoPanel::InfoPanel(QWidget *parent) : QWidget(parent) {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(kPanelMargin, kPanelMargin, kPanelMargin, kPanelMargin);
     root->setSpacing(kPanelMargin);
-
-    m_thumb = new QLabel(this);
-    m_thumb->setAlignment(Qt::AlignCenter);
-    m_thumb->setMinimumSize(1, 1);
-    root->addWidget(m_thumb, 0, Qt::AlignHCenter);
-
-    auto *separator = new QFrame(this);
-    separator->setFrameShape(QFrame::HLine);
-    separator->setFrameShadow(QFrame::Sunken);
-    root->addWidget(separator);
 
     auto *fields = new QWidget(this);
     m_form = new QFormLayout(fields);
@@ -67,7 +50,6 @@ InfoPanel::InfoPanel(ThumbnailCache *cache, QWidget *parent)
 void InfoPanel::showFile(const QString &path) {
     m_currentPath = path;
     clearForm();
-    refreshThumbnail();
 
     if (path.isEmpty() || !QFileInfo::exists(path)) {
         addRow("Status", "No selection");
@@ -184,27 +166,4 @@ void InfoPanel::onExifFinished() {
         const QString lon = jsonField(obj, "GPSLongitude");
         if (!lat.isEmpty() && !lon.isEmpty()) addRow("GPS", lat + ", " + lon);
     }
-}
-
-void InfoPanel::refreshThumbnail() {
-    if (m_currentPath.isEmpty() || !m_cache) {
-        m_thumb->clear();
-        m_thumb->setFixedSize(0, 0);
-        return;
-    }
-    const int side = std::min(kThumbMaxSize,
-                              std::max(1, width() - 2 * kPanelMargin));
-    const QPixmap pm = m_cache->getThumbnail(m_currentPath, QSize(side, side));
-    if (pm.isNull()) {
-        m_thumb->clear();
-        m_thumb->setFixedSize(0, 0);
-    } else {
-        m_thumb->setPixmap(pm);
-        m_thumb->setFixedSize(pm.size());
-    }
-}
-
-void InfoPanel::resizeEvent(QResizeEvent *event) {
-    QWidget::resizeEvent(event);
-    refreshThumbnail();
 }
