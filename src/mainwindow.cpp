@@ -157,7 +157,7 @@ void MainWindow::runAction(Action *action) {
         return;
     }
 
-    const QStringList outputs = action->apply(inputs);
+    const QStringList outputs = action->apply(inputs, nullptr);
     if (outputs.isEmpty()) {
         statusBar()->showMessage("Action produced no output", 5000);
     } else {

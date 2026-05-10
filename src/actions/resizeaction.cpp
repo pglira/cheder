@@ -2,22 +2,16 @@
 
 #include "actionwidgets.h"
 
-#include <QComboBox>
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QDir>
-#include <QFileInfo>
-#include <QFormLayout>
 #include <QImage>
 #include <QImageReader>
 #include <QImageWriter>
-#include <QLineEdit>
 #include <QSpinBox>
-#include <QVBoxLayout>
 
 bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Resize");
+
+    auto shell = beginActionDialog(&dlg, inputs);
 
     auto *modeBox = new QComboBox(&dlg);
     modeBox->addItem("Longest edge (px)", static_cast<int>(Mode::LongestEdgePx));
@@ -41,33 +35,22 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
     syncSpinRange();
     QObject::connect(modeBox, &QComboBox::currentIndexChanged, &dlg, syncSpinRange);
 
-    auto *outEdit = new QLineEdit(defaultOutDir, &dlg);
+    shell.form->addRow("Mode",  modeBox);
+    shell.form->addRow("Value", valueSpin);
 
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-    QObject::connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-
-    auto *form = new QFormLayout;
-    form->addRow("Mode",             modeBox);
-    form->addRow("Value",            valueSpin);
-    form->addRow("Output directory", outputDirField(outEdit, &dlg));
-
-    auto *root = new QVBoxLayout(&dlg);
-    root->addWidget(makeInputsLabel(inputs.size(), &dlg));
-    root->addLayout(form);
-    root->addWidget(buttons);
-    styleActionDialog(dlg);
+    finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
 
-    m_mode   = static_cast<Mode>(modeBox->currentData().toInt());
-    m_value  = valueSpin->value();
-    m_outDir = outEdit->text().trimmed();
+    m_mode      = static_cast<Mode>(modeBox->currentData().toInt());
+    m_value     = valueSpin->value();
+    m_outDir    = shell.outDirEdit->text().trimmed();
+    m_overwrite = overwriteFromBox(shell.overwriteBox);
     if (m_outDir.isEmpty()) return false;
     return true;
 }
 
-QString ResizeAction::applyOne(const QString &input) {
+QString ResizeAction::applyOne(const QString &input, ActionLogger *logger) {
     QImageReader reader(input);
     reader.setAutoTransform(true);
     QImage img = reader.read();
@@ -88,11 +71,8 @@ QString ResizeAction::applyOne(const QString &input) {
 
     QImage scaled = img.scaled(target, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
-    QDir().mkpath(m_outDir);
-    const QFileInfo fi(input);
-    const QString outPath = m_outDir + '/' + fi.fileName();
-
-    QImageWriter writer(outPath);
-    if (!writer.write(scaled)) return {};
-    return outPath;
+    return writeOne(input, logger, [&](const QString &tempPath) {
+        QImageWriter writer(tempPath);
+        return writer.write(scaled);
+    });
 }

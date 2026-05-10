@@ -21,9 +21,11 @@ add_executable(cheder
     src/thumbnailview.cpp
     src/thumbnailview.h
 
+    src/actions/action.cpp
     src/actions/action.h
     src/actions/actionbar.cpp
     src/actions/actionbar.h
+    src/actions/actionlogger.h
     src/actions/actionregistry.cpp
     src/actions/actionregistry.h
     src/actions/actionwidgets.h

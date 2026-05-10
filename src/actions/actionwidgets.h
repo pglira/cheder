@@ -1,12 +1,18 @@
 #pragma once
 
+#include "action.h"
+
+#include <QComboBox>
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFont>
+#include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QVBoxLayout>
 #include <QWidget>
 
 // Set as a minimum so the dialog opens wide but the user can grow it.
@@ -43,4 +49,67 @@ inline QWidget *outputDirField(QLineEdit *edit, QWidget *parent) {
         if (!picked.isEmpty()) edit->setText(picked);
     });
     return row;
+}
+
+// Shared scaffolding so each action's configure() only describes its own
+// parameter rows. The pattern is:
+//
+//   QDialog dlg(parent);
+//   dlg.setWindowTitle("Resize");
+//   auto shell = beginActionDialog(&dlg, inputs);
+//   shell.form->addRow("Mode",  modeBox);
+//   shell.form->addRow("Value", valueSpin);
+//   finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
+//   if (dlg.exec() != QDialog::Accepted) return false;
+//   m_outDir    = shell.outDirEdit->text().trimmed();
+//   m_overwrite = overwriteFromBox(shell.overwriteBox);
+struct ActionDialogShell {
+    QFormLayout *form         = nullptr;  // action adds its rows here
+    QLineEdit   *outDirEdit   = nullptr;  // populated by finishActionDialog
+    QComboBox   *overwriteBox = nullptr;  // populated by finishActionDialog
+};
+
+inline ActionDialogShell beginActionDialog(QDialog *dlg, const QStringList &inputs) {
+    styleActionDialog(*dlg);
+    auto *root = new QVBoxLayout(dlg);
+    root->addWidget(makeInputsLabel(inputs.size(), dlg));
+
+    ActionDialogShell shell;
+    shell.form = new QFormLayout;
+    root->addLayout(shell.form);
+    return shell;
+}
+
+inline void finishActionDialog(ActionDialogShell &shell, QDialog *dlg,
+                               const QString &defaultOutDir,
+                               BatchAction::Overwrite defaultOverwrite =
+                                   BatchAction::Overwrite::Overwrite) {
+    shell.outDirEdit = new QLineEdit(defaultOutDir, dlg);
+    shell.form->addRow("Output directory", outputDirField(shell.outDirEdit, dlg));
+
+    shell.overwriteBox = new QComboBox(dlg);
+    shell.overwriteBox->addItem("Overwrite existing files",
+                                static_cast<int>(BatchAction::Overwrite::Overwrite));
+    shell.overwriteBox->addItem("Skip existing files",
+                                static_cast<int>(BatchAction::Overwrite::Skip));
+    shell.overwriteBox->addItem("Rename (foo_1.jpg, foo_2.jpg, ...)",
+                                static_cast<int>(BatchAction::Overwrite::Rename));
+    for (int i = 0; i < shell.overwriteBox->count(); ++i) {
+        if (shell.overwriteBox->itemData(i).toInt() == static_cast<int>(defaultOverwrite)) {
+            shell.overwriteBox->setCurrentIndex(i);
+            break;
+        }
+    }
+    shell.form->addRow("If output exists", shell.overwriteBox);
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, dlg);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, dlg, &QDialog::accept);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
+
+    if (auto *vbox = qobject_cast<QVBoxLayout *>(dlg->layout()))
+        vbox->addWidget(buttons);
+}
+
+inline BatchAction::Overwrite overwriteFromBox(QComboBox *box) {
+    return static_cast<BatchAction::Overwrite>(box->currentData().toInt());
 }

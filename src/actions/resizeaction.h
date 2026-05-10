@@ -11,7 +11,7 @@ public:
     bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
 
 protected:
-    QString applyOne(const QString &input) override;
+    QString applyOne(const QString &input, ActionLogger *logger) override;
 
 private:
     enum class Mode { LongestEdgePx, ScalePercent };
