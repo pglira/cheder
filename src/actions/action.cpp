@@ -39,17 +39,11 @@ QString BatchAction::resolveOutputPath(const QString &input, ActionLogger *logge
         return QFileInfo(a).absoluteFilePath() == QFileInfo(b).absoluteFilePath();
     };
 
-    // Refuse to write a result over the input itself. Hits when the user
-    // points the output dir at the source dir and policy is Overwrite/Skip.
-    // For Rename we fall through; the suffix loop will pick foo_1.ext.
-    if (sameFile(candidate, input) && m_overwrite != Overwrite::Rename) {
-        if (logger) logger->warn(QString("skip %1 — would overwrite source").arg(base));
-        ++m_skippedThisRun;
-        return {};
-    }
+    if (!QFile::exists(candidate)) return candidate;
 
-    if (!QFile::exists(candidate) && !sameFile(candidate, input)) return candidate;
-
+    // Candidate exists. With Overwrite that's fine (including in-place edits
+    // when output dir == source dir); writeOne() goes through a sibling .part
+    // file so the source is intact until the rename succeeds.
     switch (m_overwrite) {
     case Overwrite::Overwrite:
         return candidate;

@@ -16,7 +16,7 @@ class Action {
 public:
     virtual ~Action() = default;
 
-    // Stable identifier. Also used as the default output subdirectory name.
+    // Stable identifier (used by the action bar's filter).
     virtual QString id() const = 0;
     virtual QString name() const = 0;
     virtual QString description() const { return {}; }

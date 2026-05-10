@@ -132,11 +132,10 @@ QStringList MainWindow::currentInputs() const {
 }
 
 QString MainWindow::defaultOutputDirFor(const Action *action) const {
+    Q_UNUSED(action);
     const QStringList inputs = currentInputs();
-    QString srcDir;
-    if (!inputs.isEmpty()) srcDir = QFileInfo(inputs.first()).absolutePath();
-    else                   srcDir = QDir::currentPath();
-    return srcDir + '/' + action->id();
+    if (!inputs.isEmpty()) return QFileInfo(inputs.first()).absolutePath();
+    return QDir::currentPath();
 }
 
 void MainWindow::runAction(Action *action) {
