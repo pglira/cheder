@@ -20,16 +20,19 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
 
     auto *valueSpin = new QSpinBox(&dlg);
     valueSpin->setRange(1, 100000);
-    valueSpin->setValue(m_value);
 
-    auto syncSpinRange = [valueSpin, modeBox]() {
+    // Each mode has its own remembered value, so toggling Mode swaps the
+    // spinner to a sensible default (1024 px or 50 %) instead of clamping.
+    auto syncSpinRange = [valueSpin, modeBox, this]() {
         const auto mode = static_cast<Mode>(modeBox->currentData().toInt());
         if (mode == Mode::ScalePercent) {
             valueSpin->setRange(1, 1000);
             valueSpin->setSuffix(" %");
+            valueSpin->setValue(m_percent);
         } else {
             valueSpin->setRange(1, 100000);
             valueSpin->setSuffix(" px");
+            valueSpin->setValue(m_pixels);
         }
     };
     syncSpinRange();
@@ -42,8 +45,9 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
 
     if (dlg.exec() != QDialog::Accepted) return false;
 
-    m_mode      = static_cast<Mode>(modeBox->currentData().toInt());
-    m_value     = valueSpin->value();
+    m_mode = static_cast<Mode>(modeBox->currentData().toInt());
+    if (m_mode == Mode::ScalePercent) m_percent = valueSpin->value();
+    else                              m_pixels  = valueSpin->value();
     m_outDir    = shell.outDirEdit->text().trimmed();
     m_overwrite = overwriteFromBox(shell.overwriteBox);
     if (m_outDir.isEmpty()) return false;
@@ -60,11 +64,11 @@ QString ResizeAction::applyOne(const QString &input, ActionLogger *logger) {
     if (m_mode == Mode::LongestEdgePx) {
         const int longest = std::max(img.width(), img.height());
         if (longest <= 0) return {};
-        const double f = static_cast<double>(m_value) / longest;
+        const double f = static_cast<double>(m_pixels) / longest;
         target = QSize(std::max(1, qRound(img.width()  * f)),
                        std::max(1, qRound(img.height() * f)));
     } else {
-        const double f = m_value / 100.0;
+        const double f = m_percent / 100.0;
         target = QSize(std::max(1, qRound(img.width()  * f)),
                        std::max(1, qRound(img.height() * f)));
     }

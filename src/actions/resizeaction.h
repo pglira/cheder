@@ -15,6 +15,7 @@ protected:
 
 private:
     enum class Mode { LongestEdgePx, ScalePercent };
-    Mode m_mode  = Mode::LongestEdgePx;
-    int  m_value = 1024;       // pixels for LongestEdgePx, percent for ScalePercent
+    Mode m_mode    = Mode::LongestEdgePx;
+    int  m_pixels  = 1024;  // for LongestEdgePx
+    int  m_percent = 50;    // for ScalePercent
 };
