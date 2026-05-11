@@ -1,7 +1,8 @@
 # cheder
 
-A small Qt6 image viewer with a thumbnail grid, a single-image view, and a
-text-driven action bar for batch operations (rotate, resize, copy/move).
+A small Qt6 image viewer with a thumbnail grid, a single-image view (with
+animated-GIF playback), and a text-driven action bar for editing and
+organizing images.
 
 ## Build
 
@@ -12,9 +13,11 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
-The thumbnail info panel uses [`exiftool`](https://exiftool.org) for EXIF
-fields — install it for camera/lens/exposure metadata, otherwise only the
-basics are shown.
+Optional external tools:
+
+- [`exiftool`](https://exiftool.org) — the info panel uses it for EXIF
+  fields (camera/lens/exposure); without it only the basics are shown.
+- `ffmpeg` — required by the **Animation** action (GIF/MP4 encoding).
 
 ## Run
 
@@ -53,13 +56,16 @@ basics are shown.
 The action bar at the bottom of the window lists actions; type to filter,
 `Enter` to invoke. Built-in:
 
-- **Rotate** (`Alt+R`) — 90° CW / CCW / 180°
-- **Resize** (`Alt+S`) — by longest edge (px) or scale (%)
+- **Animation** (`Alt+A`) — build an animated GIF or H.264 MP4 from ≥2 same-size frames; FPS, loop count (GIF), quality (MP4), live frame-flip preview
+- **Annotate** (`Alt+D`) — draw rectangles, circles, arrows, and text on a single image with per-shape color / stroke / font; select-and-edit with handles, double-click to retype text, `Ctrl+Z` to undo
 - **Caption** (`Alt+T`) — add a text caption above or below a single image (live preview)
 - **Concatenate** (`Alt+N`) — stitch ≥2 selected images horizontally or vertically (target axis, spacing, background)
-- **Crop** (`Alt+C`) — interactive rectangle on a preview, with optional aspect-ratio constraint; applies the same rect to every selected image (selection must be same-size)
-- **Rename** (`F2`) — rename a single image; output directory editable too, so it doubles as "rename + move"
 - **Copy or move** (`Alt+M`) — duplicate or relocate to a chosen directory
+- **Crop** (`Alt+C`) — interactive rectangle on a preview, with optional aspect-ratio constraint; applies the same rect to every selected image (selection must be same-size)
+- **Grid** (`Alt+G`) — compose ≥2 selected images into a 2D grid with optional per-cell titles, font, spacing, and background color (live preview)
+- **Rename** (`F2`) — rename a single image; output directory editable too, so it doubles as "rename + move"
+- **Resize** (`Alt+S`) — by longest edge (px) or scale (%)
+- **Rotate** (`Alt+R`) — 90° CW / CCW / 180°
 
 Each shortcut opens the corresponding action's dialog directly from any view.
 Selections that the action can't accept (e.g. `Alt+N` on a single image) fall
