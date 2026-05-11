@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QLocale>
 #include <QProcess>
+#include <QShowEvent>
 #include <QVBoxLayout>
 
 namespace {
@@ -43,21 +44,32 @@ InfoPanel::InfoPanel(QWidget *parent) : QWidget(parent) {
     root->addWidget(fields);
 
     root->addStretch();
-
-    showFile({});
 }
 
-void InfoPanel::showFile(const QString &path) {
+void InfoPanel::setCurrentPath(const QString &path) {
+    // Skip if neither the path nor visibility implies fresh work.
+    if (path == m_currentPath && isVisible()) return;
     m_currentPath = path;
+    // Hidden: defer; the next showEvent will refresh against the stored path
+    // (so we don't spawn exiftool while the panel isn't on screen).
+    if (isVisible()) refresh();
+}
+
+void InfoPanel::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    refresh();
+}
+
+void InfoPanel::refresh() {
     clearForm();
 
-    if (path.isEmpty() || !QFileInfo::exists(path)) {
+    if (m_currentPath.isEmpty() || !QFileInfo::exists(m_currentPath)) {
         addRow("Status", "No selection");
         return;
     }
 
-    populateBasics(path);
-    requestExif(path);
+    populateBasics(m_currentPath);
+    requestExif(m_currentPath);
 }
 
 void InfoPanel::clearForm() {

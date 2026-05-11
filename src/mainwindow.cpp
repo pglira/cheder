@@ -86,9 +86,9 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     connect(m_imageView, &ImageView::currentChanged, this,
             [this](int, const QString &path) {
                 updateTitle();
-                // Skip the (potentially exiftool-spawning) refresh if the panel
-                // is hidden; the next `i` toggle will load it on demand.
-                if (m_infoPanel->isVisible()) m_infoPanel->showFile(path);
+                // InfoPanel gates its own refresh on visibility — safe to call
+                // unconditionally; hidden updates are deferred until shown.
+                m_infoPanel->setCurrentPath(path);
             });
 
     qApp->installEventFilter(this);
@@ -453,11 +453,8 @@ bool MainWindow::handleKeyInImage(int key) {
         m_imageView->previous();
         return true;
     case Qt::Key_I:
+        // The panel refreshes itself on showEvent; nothing else to do here.
         m_infoPanel->setVisible(!m_infoPanel->isVisible());
-        // Hidden -> shown: panel may be stale (we skipped updates while hidden).
-        // Refresh against the current image so it lights up immediately.
-        if (m_infoPanel->isVisible())
-            m_infoPanel->showFile(m_imageView->currentPath());
         return true;
     case Qt::Key_Delete:
         deleteCurrentInputs();
