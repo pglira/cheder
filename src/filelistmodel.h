@@ -20,8 +20,12 @@ public:
     QString at(int i) const { return (i >= 0 && i < m_files.size()) ? m_files.at(i) : QString(); }
     int     indexOf(const QString &path) const { return m_files.indexOf(path); }
 
+    // Always emits filesChanged, even when the path list is identical: callers
+    // (MainWindow::reload, fired by F5 / post-action) treat this as a deliberate
+    // "re-scan and refresh" signal. An action that overwrites a file in place
+    // produces the same path list but different content, and the views need to
+    // re-decode from disk.
     void setFiles(const QStringList &files) {
-        if (m_files == files) return;
         m_files = files;
         emit filesChanged();
     }
