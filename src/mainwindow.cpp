@@ -91,8 +91,79 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
                 m_infoPanel->setCurrentPath(path);
             });
 
+    wireKeyBindings();
+
     qApp->installEventFilter(this);
     updateTitle();
+}
+
+void MainWindow::wireKeyBindings() {
+    using Mode = KeyDispatcher::Mode;
+
+    // Global shortcuts that fire even while the action bar's input is focused.
+    m_keys.bind({Qt::Key_F5,  {}, {}, Mode::Anywhere, /*fireWhileInputFocused=*/true,
+                 [this] { reload(); }});
+    m_keys.bind({Qt::Key_P, Qt::ControlModifier, {}, Mode::Anywhere, true,
+                 [this] { m_actionPane->focusInput(); }});
+
+    // 'q' / 'Q' closes from any view; Ctrl/Alt/Meta+Q does not (let the OS or
+    // the action bar's QLineEdit handle those).
+    m_keys.bind({Qt::Key_Q, {},
+                 Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier,
+                 Mode::Anywhere, false, [this] { close(); }});
+
+    m_keys.bind({Qt::Key_C, Qt::ControlModifier, {}, Mode::Anywhere, false,
+                 [this] { copySelectionToClipboard(); }});
+
+    // Vim sequences: gg → Home (via synthetic dispatch to focused widget);
+    // dd → delete current selection (with confirmation).
+    m_keys.setSequenceTranslation(Qt::Key_G, Qt::Key_Home);
+    m_keys.setSequenceHandler(Qt::Key_D, [this] { deleteCurrentInputs(); });
+
+    // Vim translations: hjkl → arrow keys (regardless of modifiers);
+    // Shift+G → End (Shift stripped from the synthesized event).
+    m_keys.addTranslation({Qt::Key_H, {}, Qt::Key_Left,  {}});
+    m_keys.addTranslation({Qt::Key_J, {}, Qt::Key_Down,  {}});
+    m_keys.addTranslation({Qt::Key_K, {}, Qt::Key_Up,    {}});
+    m_keys.addTranslation({Qt::Key_L, {}, Qt::Key_Right, {}});
+    m_keys.addTranslation({Qt::Key_G, Qt::ShiftModifier, Qt::Key_End, Qt::ShiftModifier});
+
+    // Delete from either view (with confirmation).
+    m_keys.bind({Qt::Key_Delete, {}, {}, Mode::Anywhere, false,
+                 [this] { deleteCurrentInputs(); }});
+
+    // Thumbnail view: open / zoom.
+    auto bindThumb = [this](Qt::Key k, KeyDispatcher::Handler h) {
+        m_keys.bind({k, {}, {}, Mode::Thumbnail, false, std::move(h)});
+    };
+    auto openCurrent = [this] {
+        int row = m_thumbView->firstSelectedRow();
+        if (row < 0) row = 0;
+        showImage(row);
+    };
+    bindThumb(Qt::Key_Tab,    openCurrent);
+    bindThumb(Qt::Key_Backtab, openCurrent);
+    bindThumb(Qt::Key_Return,  openCurrent);
+    bindThumb(Qt::Key_Enter,   openCurrent);
+    bindThumb(Qt::Key_Plus,    [this] { m_thumbView->zoomIn();  });
+    bindThumb(Qt::Key_Equal,   [this] { m_thumbView->zoomIn();  });
+    bindThumb(Qt::Key_Minus,   [this] { m_thumbView->zoomOut(); });
+
+    // Image view: nav / info-panel toggle / back to thumbnails.
+    auto bindImage = [this](Qt::Key k, KeyDispatcher::Handler h) {
+        m_keys.bind({k, {}, {}, Mode::Image, false, std::move(h)});
+    };
+    auto back = [this] { showThumbnails(); };
+    bindImage(Qt::Key_Tab,    back);
+    bindImage(Qt::Key_Backtab, back);
+    bindImage(Qt::Key_Escape,  back);
+    bindImage(Qt::Key_Right, [this] { m_imageView->next();     });
+    bindImage(Qt::Key_N,     [this] { m_imageView->next();     });
+    bindImage(Qt::Key_Left,  [this] { m_imageView->previous(); });
+    bindImage(Qt::Key_P,     [this] { m_imageView->previous(); });
+    bindImage(Qt::Key_I,     [this] {
+        m_infoPanel->setVisible(!m_infoPanel->isVisible());
+    });
 }
 
 MainWindow::~MainWindow() = default;
@@ -313,151 +384,25 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() != QEvent::KeyPress || !isActiveWindow()) return false;
 
     auto *ke = static_cast<QKeyEvent *>(event);
-    const int origKey = ke->key();
-    const auto origMods = ke->modifiers();
+    const auto mode = inThumbnailView()
+        ? KeyDispatcher::Mode::Thumbnail
+        : KeyDispatcher::Mode::Image;
+    const auto r = m_keys.dispatch(ke, mode, m_actionPane->isInputFocused());
 
-    // F5 reloads from any context (including while typing in the action bar).
-    if (origKey == Qt::Key_F5) {
-        reload();
+    switch (r.status) {
+    case KeyDispatcher::Result::Pass:
+        return false;
+    case KeyDispatcher::Result::Handled:
         return true;
-    }
-
-    // Ctrl+P focuses the action bar from any view. Handled before the
-    // input-focused guard so it also re-selects the field when already
-    // focused (harmless no-op visually).
-    if (origKey == Qt::Key_P && (origMods & Qt::ControlModifier)) {
-        m_actionPane->focusInput();
-        return true;
-    }
-
-    // While the user is typing in the action bar's search field, leave the
-    // event alone — no vim translation, no view shortcuts.
-    if (m_actionPane->isInputFocused()) return false;
-
-    // Ctrl+C copies the current selection. Placed after the input-focused
-    // guard so the action bar's line edit keeps its native text-copy.
-    if (origKey == Qt::Key_C && (origMods & Qt::ControlModifier)) {
-        copySelectionToClipboard();
-        return true;
-    }
-
-    // 'q' (or Shift+Q) closes the window from either view; placed after the
-    // input-focused guard so typing 'q' into the filter just types a letter.
-    if (origKey == Qt::Key_Q
-        && !(origMods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
-        close();
-        return true;
-    }
-
-    // "gg" sequence: lowercase g pressed twice -> Home
-    if (origKey == Qt::Key_G && !(origMods & Qt::ShiftModifier)) {
-        m_pendingD = false;  // 'g' cancels a pending 'd'
-        if (!m_pendingG) {
-            m_pendingG = true;
-            return true;
+    case KeyDispatcher::Result::NeedsSynthetic:
+        // Re-dispatch as a synthetic event so the focused widget sees the
+        // translated key (e.g. a QListWidget's default arrow-key navigation).
+        if (QWidget *target = QApplication::focusWidget()) {
+            m_dispatchingSyntheticKey = true;
+            QKeyEvent translated(QEvent::KeyPress, r.syntheticKey, r.syntheticMods);
+            QApplication::sendEvent(target, &translated);
+            m_dispatchingSyntheticKey = false;
         }
-        m_pendingG = false;
-        return dispatchTranslatedKey(Qt::Key_Home, origMods);
-    }
-
-    // "dd" sequence (vim-style): lowercase d pressed twice -> delete inputs.
-    if (origKey == Qt::Key_D
-        && !(origMods & (Qt::ShiftModifier | Qt::ControlModifier
-                         | Qt::AltModifier | Qt::MetaModifier))) {
-        m_pendingG = false;  // 'd' cancels a pending 'g'
-        if (!m_pendingD) {
-            m_pendingD = true;
-            return true;
-        }
-        m_pendingD = false;
-        deleteCurrentInputs();
-        return true;
-    }
-
-    // Any other key cancels both pending sequences.
-    m_pendingG = false;
-    m_pendingD = false;
-
-    int key = origKey;
-    auto mods = origMods;
-    switch (origKey) {
-    case Qt::Key_H: key = Qt::Key_Left;  break;
-    case Qt::Key_J: key = Qt::Key_Down;  break;
-    case Qt::Key_K: key = Qt::Key_Up;    break;
-    case Qt::Key_L: key = Qt::Key_Right; break;
-    case Qt::Key_G:
-        // Shift+G -> End. Drop the Shift used to type the capital.
-        key = Qt::Key_End;
-        mods &= ~Qt::ShiftModifier;
-        break;
-    }
-
-    if (key != origKey)
-        return dispatchTranslatedKey(key, mods);
-
-    return inThumbnailView() ? handleKeyInThumbnails(origKey) : handleKeyInImage(origKey);
-}
-
-bool MainWindow::dispatchTranslatedKey(int key, Qt::KeyboardModifiers mods) {
-    if (inThumbnailView() ? handleKeyInThumbnails(key) : handleKeyInImage(key))
-        return true;
-    // No explicit handler — re-dispatch as a synthetic event so the focused
-    // widget sees the translated key (e.g. QListWidget's built-in nav).
-    if (QWidget *target = QApplication::focusWidget()) {
-        m_dispatchingSyntheticKey = true;
-        QKeyEvent translated(QEvent::KeyPress, key, mods);
-        QApplication::sendEvent(target, &translated);
-        m_dispatchingSyntheticKey = false;
-    }
-    return true;
-}
-
-bool MainWindow::handleKeyInThumbnails(int key) {
-    switch (key) {
-    case Qt::Key_Tab:
-    case Qt::Key_Backtab:
-    case Qt::Key_Return:
-    case Qt::Key_Enter: {
-        int row = m_thumbView->firstSelectedRow();
-        if (row < 0) row = 0;
-        showImage(row);
-        return true;
-    }
-    case Qt::Key_Plus:
-    case Qt::Key_Equal:
-        m_thumbView->zoomIn();
-        return true;
-    case Qt::Key_Minus:
-        m_thumbView->zoomOut();
-        return true;
-    case Qt::Key_Delete:
-        deleteCurrentInputs();
-        return true;
-    }
-    return false;
-}
-
-bool MainWindow::handleKeyInImage(int key) {
-    switch (key) {
-    case Qt::Key_Tab:
-    case Qt::Key_Backtab:
-    case Qt::Key_Escape:
-        showThumbnails();
-        return true;
-    case Qt::Key_Right:
-    case Qt::Key_N:
-        m_imageView->next();
-        return true;
-    case Qt::Key_Left:
-    case Qt::Key_P:
-        m_imageView->previous();
-        return true;
-    case Qt::Key_I:
-        // The panel refreshes itself on showEvent; nothing else to do here.
-        m_infoPanel->setVisible(!m_infoPanel->isVisible());
-        return true;
-    case Qt::Key_Delete:
-        deleteCurrentInputs();
         return true;
     }
     return false;

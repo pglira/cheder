@@ -1,5 +1,7 @@
 #pragma once
 
+#include "keydispatcher.h"
+
 #include <QMainWindow>
 #include <QStringList>
 
@@ -30,10 +32,8 @@ protected:
 
 private:
     bool inThumbnailView() const;
-    bool handleKeyInThumbnails(int key);
-    bool handleKeyInImage(int key);
-    bool dispatchTranslatedKey(int key, Qt::KeyboardModifiers mods);
     void updateTitle();
+    void wireKeyBindings();
 
     QStringList selectionPaths() const;
     QStringList currentInputs() const;
@@ -52,7 +52,6 @@ private:
     std::unique_ptr<FileListModel> m_fileModel;
     QString m_sourceDir;
     std::unique_ptr<ActionRegistry> m_actions;
+    KeyDispatcher m_keys;
     bool m_dispatchingSyntheticKey = false;
-    bool m_pendingG = false;
-    bool m_pendingD = false;
 };

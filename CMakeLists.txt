@@ -16,6 +16,8 @@ add_executable(cheder
     src/imageview.h
     src/infopanel.cpp
     src/infopanel.h
+    src/keydispatcher.cpp
+    src/keydispatcher.h
     src/mainwindow.cpp
     src/mainwindow.h
     src/metadatareader.cpp
