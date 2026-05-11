@@ -46,3 +46,5 @@ target_link_libraries(cheder PRIVATE Qt6::Widgets)
 
 include(GNUInstallDirs)
 install(TARGETS cheder RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES data/cheder.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)

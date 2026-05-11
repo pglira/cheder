@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=cheder
+GenericName=Image Viewer
+Comment=Browse and batch-process directories of images
+Exec=cheder %f
+Icon=image-x-generic
+Terminal=false
+StartupWMClass=cheder
+Categories=Graphics;Viewer;Photography;Qt;
+Keywords=image;photo;viewer;thumbnail;batch;
+MimeType=image/jpeg;image/png;image/gif;image/bmp;image/tiff;image/webp;image/svg+xml;image/x-portable-pixmap;image/x-portable-graymap;image/x-portable-bitmap;image/x-xbitmap;image/x-xpm;inode/directory;
+StartupNotify=true

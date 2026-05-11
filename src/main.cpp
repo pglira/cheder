@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QIcon>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStringList>
@@ -67,6 +68,10 @@ bool resolveStartupInput(const QString &filePath, const QString &dirPath, Startu
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setApplicationName("cheder");
+    // Belt-and-suspenders icon source for window managers: Qt sets _NET_WM_ICON
+    // from this, and the .desktop file (with matching StartupWMClass=cheder)
+    // covers the launcher entry. Falls back gracefully if the theme lacks it.
+    app.setWindowIcon(QIcon::fromTheme("image-x-generic"));
 
     QString filePath, dirPath;
 
