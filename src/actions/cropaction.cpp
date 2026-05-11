@@ -382,6 +382,11 @@ bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QSt
         inputsList->addItem(item);
     }
     inputsList->setCurrentRow(0);
+    // Constructed with dlg as parent, but only added to the previewRow's
+    // layout when there are multiple inputs. Hide it explicitly so the
+    // single-input case doesn't leave a free-floating QListWidget at (0,0)
+    // of the dialog (visible once the dialog opens maximized).
+    if (inputs.size() <= 1) inputsList->setVisible(false);
 
     auto *preview = new CropPreview(&dlg);
     const QImage first = readImage(inputs.first());
