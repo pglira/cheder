@@ -50,6 +50,9 @@ public:
                                      | Qt::WindowMinimizeButtonHint
                                      | Qt::WindowMaximizeButtonHint);
             m_dialog->setSizeGripEnabled(true);
+            // Preview-bearing dialogs benefit from real estate on first open;
+            // the user can still restore down via the window controls.
+            m_dialog->setWindowState(Qt::WindowMaximized);
         }
 
         auto *root = new QVBoxLayout(m_dialog);
