@@ -45,6 +45,8 @@ add_executable(cheder
     src/actions/concatenateaction.h
     src/actions/copymoveaction.cpp
     src/actions/copymoveaction.h
+    src/actions/cropaction.cpp
+    src/actions/cropaction.h
     src/actions/resizeaction.cpp
     src/actions/resizeaction.h
     src/actions/rotateaction.cpp

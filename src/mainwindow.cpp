@@ -7,6 +7,7 @@
 #include "actions/captionaction.h"
 #include "actions/concatenateaction.h"
 #include "actions/copymoveaction.h"
+#include "actions/cropaction.h"
 #include "actions/resizeaction.h"
 #include "actions/rotateaction.h"
 #include "filelistmodel.h"
@@ -64,6 +65,7 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     m_actions->add(std::make_unique<RotateAction>());
     m_actions->add(std::make_unique<ResizeAction>());
     m_actions->add(std::make_unique<CaptionAction>());
+    m_actions->add(std::make_unique<CropAction>());
     m_actions->add(std::make_unique<ConcatenateAction>());
     m_actions->add(std::make_unique<CopyMoveAction>());
 
