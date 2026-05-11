@@ -307,7 +307,7 @@ QStringList ConcatenateAction::apply(const QStringList &inputs, ActionLogger *lo
     if (srcs.size() < 2) {
         if (logger) {
             logger->error("nothing to concatenate after decode failures");
-            logger->endRun(name(), 0, 0, 1);
+            logger->endRun(0, 0, 1);
         }
         return {};
     }
@@ -316,7 +316,7 @@ QStringList ConcatenateAction::apply(const QStringList &inputs, ActionLogger *lo
     if (rendered.isNull()) {
         if (logger) {
             logger->error("render produced an empty image");
-            logger->endRun(name(), 0, 0, 1);
+            logger->endRun(0, 0, 1);
         }
         return {};
     }
@@ -324,8 +324,7 @@ QStringList ConcatenateAction::apply(const QStringList &inputs, ActionLogger *lo
     const auto resolved = WriteTarget::resolve(m_outDir, m_outFilename,
                                                m_overwrite, logger);
     if (resolved.status != WriteTarget::ResolveStatus::Ok) {
-        if (logger) logger->endRun(name(),
-                                   /*written=*/0,
+        if (logger) logger->endRun(/*written=*/0,
                                    /*skipped=*/resolved.status == WriteTarget::ResolveStatus::Skip ? 1 : 0,
                                    /*failed=*/ resolved.status == WriteTarget::ResolveStatus::Failed ? 1 : 0);
         return {};
@@ -340,11 +339,11 @@ QStringList ConcatenateAction::apply(const QStringList &inputs, ActionLogger *lo
             return writer.write(rendered);
         });
     if (finalPath.isEmpty()) {
-        if (logger) logger->endRun(name(), 0, 0, 1);
+        if (logger) logger->endRun(0, 0, 1);
         return {};
     }
 
-    if (logger) logger->endRun(name(), /*written=*/1, /*skipped=*/0,
+    if (logger) logger->endRun(/*written=*/1, /*skipped=*/0,
                                /*failed=*/decodeFailures);
     return {finalPath};
 }

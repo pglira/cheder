@@ -25,7 +25,7 @@ QStringList BatchAction::apply(const QStringList &inputs, ActionLogger *logger) 
     const int unaccounted = inputs.size() - written - failed - skipped;
     if (unaccounted > 0) failed += unaccounted;
 
-    if (logger) logger->endRun(name(), written, skipped, failed);
+    if (logger) logger->endRun(written, skipped, failed);
     return outputs;
 }
 
