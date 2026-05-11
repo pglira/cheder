@@ -9,7 +9,6 @@
 #include <QAbstractItemView>
 #include <QColor>
 #include <QDir>
-#include <QEvent>
 #include <QFileInfo>
 #include <QHash>
 #include <QImageWriter>
@@ -20,27 +19,9 @@
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <memory>
 
 namespace {
-
-// Small QObject-based event filter that invokes a callback whenever its target
-// receives an event of the configured type. Used here to refresh the preview
-// when the preview QLabel is resized by the form layout.
-class CallbackFilter : public QObject {
-public:
-    CallbackFilter(QEvent::Type type, std::function<void()> cb, QObject *parent)
-        : QObject(parent), m_type(type), m_cb(std::move(cb)) {}
-protected:
-    bool eventFilter(QObject *, QEvent *e) override {
-        if (e->type() == m_type) m_cb();
-        return false;
-    }
-private:
-    QEvent::Type          m_type;
-    std::function<void()> m_cb;
-};
 
 QStringList orderedPathsFrom(QListWidget *list) {
     QStringList paths;
@@ -266,12 +247,6 @@ bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, co
                      [refreshPreview] { refreshPreview(); });
     QObject::connect(inputsList->model(), &QAbstractItemModel::rowsInserted, &dlg,
                      [refreshPreview] { refreshPreview(); });
-    // Resize-driven re-render so the preview tracks the pane as the dialog
-    // grows/shrinks. setPixmap doesn't trigger a resize of the label itself
-    // (label geometry comes from the parent layout), so there's no feedback.
-    previewLabel->installEventFilter(
-        new CallbackFilter(QEvent::Resize, [refreshPreview] { refreshPreview(); }, &dlg));
-
     // Bg→filename coupling: Transparent rewrites a non-.png filename to .png.
     // Switching back to a solid bg leaves the user's filename alone.
     QObject::connect(bgBox, &QComboBox::currentIndexChanged, &dlg, [bgBox, filenameEdit] {
@@ -288,10 +263,10 @@ bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, co
     b.addRow("Spacing",     spacingSpin);
     b.addRow("Background",  bgBox);
     b.addRow("Order",       listRow);
-    b.addRow("Preview",     previewLabel);
     // "Output file" sits immediately above "Output directory" (added next by
     // addOutputControls), so the two output-target rows read as a pair.
     b.addRow("Output file", filenameEdit);
+    b.setPreview(previewLabel, refreshPreview);
     b.addOutputControls(defaultOutDir, m_overwrite);
 
     refreshPreview();

@@ -96,7 +96,7 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     previewLabel->setFrameShape(QFrame::StyledPanel);
     if (srcOrig.isNull())
         previewLabel->setText("(preview unavailable)");
-    b.addRow(previewLabel);
+    b.setPreview(previewLabel);
 
     // Render at the source's full resolution with the configured pointSize.
     // Display-time scaling is delegated to PreviewLabel, which fits the

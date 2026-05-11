@@ -373,31 +373,27 @@ bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QSt
     customLabel->setVisible(false);
     customRow->setVisible(false);
 
-    auto *inputsList = new QListWidget(&dlg);
-    inputsList->setSelectionMode(QAbstractItemView::SingleSelection);
-    inputsList->setMaximumWidth(280);
-    for (const QString &p : inputs) {
-        auto *item = new QListWidgetItem(QFileInfo(p).fileName());
-        item->setData(Qt::UserRole, p);
-        inputsList->addItem(item);
+    // Only built when there's something to select between; for a single
+    // input the dialog skips the listbox entirely (constructing one and
+    // parenting it to the dialog without adding it to a layout would render
+    // it as a stray widget at (0,0) once the dialog opens maximized).
+    QListWidget *inputsList = nullptr;
+    if (inputs.size() > 1) {
+        inputsList = new QListWidget(&dlg);
+        inputsList->setSelectionMode(QAbstractItemView::SingleSelection);
+        for (const QString &p : inputs) {
+            auto *item = new QListWidgetItem(QFileInfo(p).fileName());
+            item->setData(Qt::UserRole, p);
+            inputsList->addItem(item);
+        }
+        inputsList->setCurrentRow(0);
+        inputsList->setMaximumHeight(140);
     }
-    inputsList->setCurrentRow(0);
-    // Constructed with dlg as parent, but only added to the previewRow's
-    // layout when there are multiple inputs. Hide it explicitly so the
-    // single-input case doesn't leave a free-floating QListWidget at (0,0)
-    // of the dialog (visible once the dialog opens maximized).
-    if (inputs.size() <= 1) inputsList->setVisible(false);
 
     auto *preview = new CropPreview(&dlg);
     const QImage first = readImage(inputs.first());
     preview->setImage(first);
     preview->setRect(QRect(0, 0, ref.width(), ref.height()));
-
-    auto *previewRow = new QWidget(&dlg);
-    auto *prLayout = new QHBoxLayout(previewRow);
-    prLayout->setContentsMargins(0, 0, 0, 0);
-    if (inputs.size() > 1) prLayout->addWidget(inputsList);
-    prLayout->addWidget(preview, 1);
 
     auto applyAspect = [aspectBox, wSpin, hSpin, preview, customRow, customLabel]() {
         const double v = aspectBox->currentData().toDouble();
@@ -416,15 +412,18 @@ bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QSt
     QObject::connect(wSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, applyAspect);
     QObject::connect(hSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, applyAspect);
 
-    QObject::connect(inputsList, &QListWidget::currentItemChanged, &dlg,
-                     [preview](QListWidgetItem *cur, QListWidgetItem *) {
-        if (!cur) return;
-        preview->setImage(readImage(cur->data(Qt::UserRole).toString()));
-    });
+    if (inputsList) {
+        QObject::connect(inputsList, &QListWidget::currentItemChanged, &dlg,
+                         [preview](QListWidgetItem *cur, QListWidgetItem *) {
+            if (!cur) return;
+            preview->setImage(readImage(cur->data(Qt::UserRole).toString()));
+        });
+    }
 
     b.addRow("Aspect", aspectBox);
     b.addRow(customLabel, customRow);
-    b.addRow(previewRow);
+    if (inputsList) b.addRow("Image", inputsList);
+    b.setPreview(preview);
     b.addOutputControls(defaultOutDir, m_overwrite);
 
     const auto r = b.exec();

@@ -5,19 +5,48 @@
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFont>
 #include <QFormLayout>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLayout>
 #include <QLineEdit>
+#include <QObject>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QSplitter>
 #include <QStringList>
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include <functional>
+#include <utility>
+
 constexpr int kActionDialogMinWidth = 800;
+
+namespace ActionDialogInternal {
+
+// Invokes `cb` whenever the watched object receives a resize event. Used by
+// ActionDialogBuilder::setPreview to drive a re-render when the preview pane
+// changes size (setPixmap alone doesn't trigger a label resize, so callbacks
+// that render at the pane's resolution need to listen to Qt directly).
+class ResizeWatcher : public QObject {
+public:
+    ResizeWatcher(std::function<void()> cb, QObject *parent)
+        : QObject(parent), m_cb(std::move(cb)) {}
+protected:
+    bool eventFilter(QObject *, QEvent *e) override {
+        if (e->type() == QEvent::Resize) m_cb();
+        return false;
+    }
+private:
+    std::function<void()> m_cb;
+};
+
+}  // namespace ActionDialogInternal
 
 // Builds the parameter dialog for an action — header ("Inputs: N files"),
 // caller-supplied rows, then an output-directory line edit + overwrite-policy
@@ -38,7 +67,13 @@ constexpr int kActionDialogMinWidth = 800;
 //   m_overwrite = r.overwrite;
 //
 // `resizable=true` for dialogs whose preview benefits from extra real estate
-// (Caption, Concatenate). Default is fixed-size.
+// (Caption, Concatenate, Crop, Grid). Default is fixed-size.
+//
+// Calling setPreview(w) promotes the dialog to a two-column QSplitter layout:
+// all form rows (including those added later via addRow / addOutputControls)
+// sit in the left column inside a QScrollArea; `w` claims the right column.
+// The button box is appended below the splitter. Only meaningful when
+// resizable=true.
 class ActionDialogBuilder {
 public:
     ActionDialogBuilder(QDialog *dlg, const QStringList &inputs, bool resizable = false)
@@ -55,9 +90,9 @@ public:
             m_dialog->setWindowState(Qt::WindowMaximized);
         }
 
-        auto *root = new QVBoxLayout(m_dialog);
+        m_root = new QVBoxLayout(m_dialog);
         if (!resizable)
-            root->setSizeConstraint(QLayout::SetFixedSize);
+            m_root->setSizeConstraint(QLayout::SetFixedSize);
 
         // Pin opening width via a min on the header label so SetFixedSize
         // honors the kActionDialogMinWidth on non-resizable dialogs.
@@ -69,10 +104,12 @@ public:
         f.setBold(true);
         header->setFont(f);
         header->setMinimumWidth(kActionDialogMinWidth);
-        root->addWidget(header);
+        m_root->addWidget(header);
 
+        // Form layout is built unparented and inserted into the dialog at
+        // exec() time — that's when we know whether setPreview() was called
+        // and need to choose between single-column and two-column layouts.
         m_form = new QFormLayout;
-        root->addLayout(m_form);
     }
 
     void addRow(const QString &label, QWidget *field) { m_form->addRow(label, field); }
@@ -119,18 +156,28 @@ public:
         }
         m_form->addRow("If output exists", m_overwriteBox);
 
-        auto *buttons = new QDialogButtonBox(
+        // Stash the button box for exec() to append below the form/splitter.
+        m_buttons = new QDialogButtonBox(
             QDialogButtonBox::Ok | QDialogButtonBox::Cancel, m_dialog);
-        QObject::connect(buttons, &QDialogButtonBox::accepted, m_dialog, &QDialog::accept);
-        QObject::connect(buttons, &QDialogButtonBox::rejected, m_dialog, &QDialog::reject);
-        if (auto *vbox = qobject_cast<QVBoxLayout *>(m_dialog->layout()))
-            vbox->addWidget(buttons);
+        QObject::connect(m_buttons, &QDialogButtonBox::accepted, m_dialog, &QDialog::accept);
+        QObject::connect(m_buttons, &QDialogButtonBox::rejected, m_dialog, &QDialog::reject);
     }
 
     // Returns nullptr before addOutputControls. Used by actions that need
     // to react to / mutate the output directory before exec() (copy-or-move
     // toggles its default between /copy and /move on mode change).
     QLineEdit *outDirEdit() const { return m_outDirEdit; }
+
+    // Promotes the layout to two columns: form on the left in a scroll area,
+    // `preview` on the right inside a draggable QSplitter. Stretch ratio
+    // favors the preview but the user can drag the splitter handle. Optional
+    // `onResize` runs whenever the preview pane changes size — wire it to
+    // your re-render lambda for resolution-adaptive previews. Call before
+    // exec(); only sensible on resizable dialogs.
+    void setPreview(QWidget *preview, std::function<void()> onResize = {}) {
+        m_previewWidget   = preview;
+        m_previewOnResize = std::move(onResize);
+    }
 
     struct Outcome {
         bool                   accepted = false;
@@ -140,6 +187,50 @@ public:
 
     // Runs the dialog. accepted=false on user-cancel or empty output dir.
     Outcome exec() {
+        // Assemble the body now that we know if setPreview() was called.
+        // Single-column path drops the form straight under the header; two-
+        // column path wraps the form in a QScrollArea and pairs it with the
+        // preview inside a horizontal splitter.
+        if (m_previewWidget) {
+            // Pack the form rows at the top of the host widget; a trailing
+            // stretch absorbs the extra vertical space the scroll area gives
+            // us. Without the stretch, QFormLayout would distribute the slack
+            // across its rows and label/field pairs would drift apart.
+            auto *formHost = new QWidget(m_dialog);
+            auto *vbox = new QVBoxLayout(formHost);
+            vbox->setContentsMargins(0, 0, 0, 0);
+            vbox->addLayout(m_form);
+            vbox->addStretch(1);
+
+            auto *scroll = new QScrollArea(m_dialog);
+            scroll->setWidgetResizable(true);
+            scroll->setFrameShape(QFrame::NoFrame);
+            scroll->setWidget(formHost);
+            // Wider default for the params column so the field rows have
+            // breathing room — sizeHint alone leaves them cramped against
+            // the long labels. User can drag the splitter handle to override.
+            scroll->setMinimumWidth(550);
+
+            auto *splitter = new QSplitter(Qt::Horizontal, m_dialog);
+            splitter->addWidget(scroll);
+            splitter->addWidget(m_previewWidget);
+            // 2:3 ratio favors the preview but keeps the form noticeably
+            // wider than its sizeHint when the dialog is maximized.
+            splitter->setStretchFactor(0, 2);
+            splitter->setStretchFactor(1, 3);
+            splitter->setChildrenCollapsible(false);
+
+            m_root->addWidget(splitter, /*stretch=*/1);
+
+            if (m_previewOnResize)
+                m_previewWidget->installEventFilter(
+                    new ActionDialogInternal::ResizeWatcher(
+                        m_previewOnResize, m_dialog));
+        } else {
+            m_root->addLayout(m_form);
+        }
+        if (m_buttons) m_root->addWidget(m_buttons);
+
         Outcome r;
         if (m_dialog->exec() != QDialog::Accepted) return r;
         if (!m_outDirEdit || !m_overwriteBox)      return r;
@@ -153,8 +244,12 @@ public:
     }
 
 private:
-    QDialog     *m_dialog;
-    QFormLayout *m_form;
-    QLineEdit   *m_outDirEdit   = nullptr;
-    QComboBox   *m_overwriteBox = nullptr;
+    QDialog              *m_dialog;
+    QVBoxLayout          *m_root          = nullptr;
+    QFormLayout          *m_form          = nullptr;
+    QWidget              *m_previewWidget = nullptr;
+    std::function<void()> m_previewOnResize;
+    QDialogButtonBox     *m_buttons       = nullptr;
+    QLineEdit            *m_outDirEdit    = nullptr;
+    QComboBox            *m_overwriteBox  = nullptr;
 };
