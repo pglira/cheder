@@ -58,6 +58,7 @@ The action bar at the bottom of the window lists actions; type to filter,
 - **Caption** (`Alt+T`) — add a text caption above or below a single image (live preview)
 - **Concatenate** (`Alt+N`) — stitch ≥2 selected images horizontally or vertically (target axis, spacing, background)
 - **Crop** (`Alt+C`) — interactive rectangle on a preview, with optional aspect-ratio constraint; applies the same rect to every selected image (selection must be same-size)
+- **Rename** (`F2`) — rename a single image; output directory editable too, so it doubles as "rename + move"
 - **Copy or move** (`Alt+M`) — duplicate or relocate to a chosen directory
 
 Each shortcut opens the corresponding action's dialog directly from any view.
