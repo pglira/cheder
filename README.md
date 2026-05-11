@@ -55,6 +55,7 @@ The action bar at the bottom of the window lists actions; type to filter,
 - **Rotate** — 90° CW / CCW / 180°
 - **Resize** — by longest edge (px) or scale (%)
 - **Caption** — add a text caption above or below a single image (live preview)
+- **Concatenate** — stitch ≥2 selected images horizontally or vertically (target axis, spacing, background)
 - **Copy or move** — duplicate or relocate to a chosen directory
 
 Each action writes to a directory you pick in its dialog (defaults to

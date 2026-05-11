@@ -30,55 +30,51 @@ QStringList BatchAction::apply(const QStringList &inputs, ActionLogger *logger) 
     return outputs;
 }
 
-QString BatchAction::resolveOutputPath(const QString &input, ActionLogger *logger) {
-    const QFileInfo fi(input);
-    const QString base = fi.fileName();
-    const QString candidate = m_outDir + '/' + base;
+BatchAction::ResolvedDest BatchAction::resolveDestPath(const QString &outDir,
+                                                       const QString &filename,
+                                                       Overwrite policy,
+                                                       ActionLogger *logger,
+                                                       const QString &avoidIfSame) {
+    const QString candidate = outDir + '/' + filename;
 
     auto sameFile = [](const QString &a, const QString &b) {
         return QFileInfo(a).absoluteFilePath() == QFileInfo(b).absoluteFilePath();
     };
 
-    if (!QFile::exists(candidate)) return candidate;
+    if (!QFile::exists(candidate)) return {candidate, ResolveStatus::Ok};
 
     // Candidate exists. With Overwrite that's fine (including in-place edits
-    // when output dir == source dir); writeOne() goes through a sibling .part
-    // file so the source is intact until the rename succeeds.
-    switch (m_overwrite) {
+    // when output dir == source dir); writeAtomically() goes through a sibling
+    // .part file so the source is intact until the rename succeeds.
+    switch (policy) {
     case Overwrite::Overwrite:
-        return candidate;
+        return {candidate, ResolveStatus::Ok};
     case Overwrite::Skip:
-        if (logger) logger->info(QString("skip %1 — already exists").arg(base));
-        ++m_skippedThisRun;
-        return {};
+        if (logger) logger->info(QString("skip %1 — already exists").arg(filename));
+        return {{}, ResolveStatus::Skip};
     case Overwrite::Rename: {
+        const QFileInfo fi(candidate);
         const QString stem   = fi.completeBaseName();
         const QString suffix = fi.suffix();
         const QString sep    = suffix.isEmpty() ? QString() : QStringLiteral(".");
         for (int n = 1; n < 10000; ++n) {
             const QString alt = QString("%1/%2_%3%4%5")
-                                    .arg(m_outDir, stem)
+                                    .arg(outDir, stem)
                                     .arg(n)
                                     .arg(sep, suffix);
-            if (sameFile(alt, input)) continue;
-            if (!QFile::exists(alt))  return alt;
+            if (!avoidIfSame.isEmpty() && sameFile(alt, avoidIfSame)) continue;
+            if (!QFile::exists(alt))                                  return {alt, ResolveStatus::Ok};
         }
-        if (logger) logger->error(QString("skip %1 — exhausted rename suffixes").arg(base));
-        ++m_failedThisRun;
-        return {};
+        if (logger) logger->error(QString("skip %1 — exhausted rename suffixes").arg(filename));
+        return {{}, ResolveStatus::Failed};
     }
     }
-    return {};
+    return {{}, ResolveStatus::Failed};
 }
 
-QString BatchAction::writeOne(const QString &input,
-                              ActionLogger *logger,
-                              std::function<bool(const QString &)> writer) {
-    const QString finalPath = resolveOutputPath(input, logger);
-    if (finalPath.isEmpty()) return {};
-
-    QDir().mkpath(m_outDir);
-
+QString BatchAction::writeAtomically(const QString &finalPath,
+                                     ActionLogger *logger,
+                                     std::function<bool(const QString &)> writer) {
     // Insert ".part" *before* the extension so format-from-extension writers
     // (QImageWriter, etc.) still detect the correct format. "foo.jpg" ->
     // "foo.part.jpg"; extensionless "foo" -> "foo.part".
@@ -92,8 +88,7 @@ QString BatchAction::writeOne(const QString &input,
     if (!writer(tempPath)) {
         QFile::remove(tempPath);
         if (logger) logger->error(QString("failed %1 — write error")
-                                      .arg(QFileInfo(input).fileName()));
-        ++m_failedThisRun;
+                                      .arg(finalInfo.fileName()));
         return {};
     }
 
@@ -101,11 +96,30 @@ QString BatchAction::writeOne(const QString &input,
     if (!QFile::rename(tempPath, finalPath)) {
         QFile::remove(tempPath);
         if (logger) logger->error(QString("failed %1 — could not finalize %2")
-                                      .arg(QFileInfo(input).fileName(), finalPath));
-        ++m_failedThisRun;
+                                      .arg(finalInfo.fileName(), finalPath));
         return {};
     }
 
     if (logger) logger->info(QString("wrote %1").arg(finalPath));
     return finalPath;
+}
+
+QString BatchAction::resolveOutputPath(const QString &input, ActionLogger *logger) {
+    const auto r = resolveDestPath(m_outDir, QFileInfo(input).fileName(),
+                                   m_overwrite, logger, input);
+    if (r.status == ResolveStatus::Skip)   ++m_skippedThisRun;
+    if (r.status == ResolveStatus::Failed) ++m_failedThisRun;
+    return r.path;
+}
+
+QString BatchAction::writeOne(const QString &input,
+                              ActionLogger *logger,
+                              std::function<bool(const QString &)> writer) {
+    const QString finalPath = resolveOutputPath(input, logger);
+    if (finalPath.isEmpty()) return {};
+
+    QDir().mkpath(m_outDir);
+    const QString out = writeAtomically(finalPath, logger, writer);
+    if (out.isEmpty()) ++m_failedThisRun;
+    return out;
 }

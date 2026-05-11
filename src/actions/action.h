@@ -42,9 +42,36 @@ class BatchAction : public Action {
 public:
     enum class Overwrite { Overwrite, Skip, Rename };
 
+    // Outcome of resolving where to write. The fan-in case (Concatenate) reads
+    // `status` to decide whether the summary line should report a skip vs a
+    // failure; BatchAction uses it to bump its per-run counters.
+    enum class ResolveStatus { Ok, Skip, Failed };
+    struct ResolvedDest {
+        QString       path;    // empty unless status == Ok
+        ResolveStatus status;
+    };
+
     bool acceptsCount(int n) const override { return n >= 1; }
 
     QStringList apply(const QStringList &inputs, ActionLogger *logger) override;
+
+    // Resolve `outDir/filename` under `policy`. Logs the reason on skip/fail.
+    // `avoidIfSame` (when non-empty) makes Rename mode skip candidates that
+    // resolve to that path — used by 1→1 in-place edits so the rename loop
+    // can't pick the source file itself.
+    static ResolvedDest resolveDestPath(const QString &outDir,
+                                        const QString &filename,
+                                        Overwrite policy,
+                                        ActionLogger *logger,
+                                        const QString &avoidIfSame = {});
+
+    // Write to a sibling ".part" file, then rename into place. Returns
+    // `finalPath` on success and logs "wrote …"; on failure returns {} and
+    // logs the reason. Callers are responsible for ensuring the parent
+    // directory exists (e.g., QDir().mkpath(outDir)).
+    static QString writeAtomically(const QString &finalPath,
+                                   ActionLogger *logger,
+                                   std::function<bool(const QString &tempPath)> writer);
 
 protected:
     // Return the produced output path, or {} on failure/skip. Implementations
