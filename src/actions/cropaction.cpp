@@ -68,6 +68,11 @@ public:
 protected:
     void paintEvent(QPaintEvent *) override {
         QPainter p(this);
+        // SmoothPixmapTransform gives bilinear filtering for the
+        // source-to-display rescale; without it QPainter's nearest-neighbor
+        // default makes the preview crawl with stair-stepping at non-integer
+        // scales.
+        p.setRenderHint(QPainter::SmoothPixmapTransform, true);
         p.fillRect(QRect(QPoint(0, 0), size()), QColor(0x22, 0x22, 0x22));
         if (m_image.isNull()) return;
 
