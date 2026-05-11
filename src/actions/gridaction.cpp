@@ -20,6 +20,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -265,7 +266,10 @@ bool GridAction::configure(QWidget *parent, const QStringList &inputs, const QSt
 
     // Moves the currently-selected row by `delta`, preserving its contents
     // across both columns. QTableWidget has no "move row" primitive; we
-    // take the items out, shift them, and reinsert.
+    // take the items out, shift them, and reinsert. The setItem reinsert
+    // would otherwise fire itemChanged and the title-source handler would
+    // misread that as a user-edit and flip the combo to Custom — block
+    // signals around the mutation and refresh the preview manually below.
     auto moveSelected = [table](int delta) {
         const int r = table->currentRow();
         if (r < 0) return;
@@ -274,21 +278,20 @@ bool GridAction::configure(QWidget *parent, const QStringList &inputs, const QSt
         QList<QTableWidgetItem *> rowItems;
         for (int c = 0; c < table->columnCount(); ++c)
             rowItems << table->takeItem(r, c);
-        table->removeRow(r);
-        table->insertRow(newRow);
-        for (int c = 0; c < rowItems.size(); ++c)
-            table->setItem(newRow, c, rowItems.at(c));
+        {
+            QSignalBlocker block(table);
+            table->removeRow(r);
+            table->insertRow(newRow);
+            for (int c = 0; c < rowItems.size(); ++c)
+                table->setItem(newRow, c, rowItems.at(c));
+        }
         table->setCurrentCell(newRow, 0);
     };
-    QObject::connect(upBtn,   &QPushButton::clicked, &dlg, [moveSelected] { moveSelected(-1); });
-    QObject::connect(downBtn, &QPushButton::clicked, &dlg, [moveSelected] { moveSelected(+1); });
 
     auto *upSc   = new QShortcut(QKeySequence("Ctrl+Up"),   &dlg);
     auto *downSc = new QShortcut(QKeySequence("Ctrl+Down"), &dlg);
     upSc->setContext(Qt::WidgetWithChildrenShortcut);
     downSc->setContext(Qt::WidgetWithChildrenShortcut);
-    QObject::connect(upSc,   &QShortcut::activated, &dlg, [moveSelected] { moveSelected(-1); });
-    QObject::connect(downSc, &QShortcut::activated, &dlg, [moveSelected] { moveSelected(+1); });
 
     auto *tableRow = new QWidget(&dlg);
     auto *tableRowLayout = new QHBoxLayout(tableRow);
@@ -381,6 +384,19 @@ bool GridAction::configure(QWidget *parent, const QStringList &inputs, const QSt
 
     wireColorButton(bgBtn,    bgState,    "Background color", refreshPreview);
     wireColorButton(titleBtn, titleState, "Title color",      refreshPreview);
+
+    // Reorder buttons + Ctrl+Up / Ctrl+Down. Connected here (after
+    // refreshPreview is in scope) so the preview re-renders for the new
+    // order — itemChanged would have done that automatically, but moveSelected
+    // suppresses it to avoid spuriously flipping the title source to Custom.
+    auto moveAndRefresh = [moveSelected, refreshPreview](int delta) {
+        moveSelected(delta);
+        refreshPreview();
+    };
+    QObject::connect(upBtn,   &QPushButton::clicked,   &dlg, [moveAndRefresh] { moveAndRefresh(-1); });
+    QObject::connect(downBtn, &QPushButton::clicked,   &dlg, [moveAndRefresh] { moveAndRefresh(+1); });
+    QObject::connect(upSc,    &QShortcut::activated,   &dlg, [moveAndRefresh] { moveAndRefresh(-1); });
+    QObject::connect(downSc,  &QShortcut::activated,   &dlg, [moveAndRefresh] { moveAndRefresh(+1); });
 
     // Auto-switch filename suffix to .png the moment any color picks up
     // transparency — JPEG can't carry alpha, so silently degrading on save
