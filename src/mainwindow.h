@@ -35,10 +35,12 @@ private:
     bool dispatchTranslatedKey(int key, Qt::KeyboardModifiers mods);
     void updateTitle();
 
+    QStringList selectionPaths() const;
     QStringList currentInputs() const;
     QString defaultOutputDirFor(const Action *action) const;
     void runAction(Action *action);
     void deleteCurrentInputs();
+    void copySelectionToClipboard();
     void returnFocusToView();
 
     QStackedWidget *m_stack;

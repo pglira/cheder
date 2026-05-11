@@ -10,20 +10,25 @@
 #include "actions/rotateaction.h"
 #include "filelistmodel.h"
 #include "imagedir.h"
+#include "imageio.h"
 #include "imageview.h"
 #include "infopanel.h"
 #include "thumbnailview.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QDir>
 #include <QEvent>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -139,13 +144,22 @@ void MainWindow::updateTitle() {
     setWindowTitle(QString("cheder (%1 images)").arg(m_fileModel->count()));
 }
 
-QStringList MainWindow::currentInputs() const {
+// Strict selection: the image-view's current image, or the thumbnail-view's
+// explicit multi-selection (no fallback). Empty when nothing is selected.
+QStringList MainWindow::selectionPaths() const {
     if (!inThumbnailView()) {
         const QString p = m_imageView->currentPath();
         return p.isEmpty() ? QStringList{} : QStringList{p};
     }
-    QStringList paths = m_thumbView->selectedPaths();
-    if (paths.isEmpty()) {
+    return m_thumbView->selectedPaths();
+}
+
+// Loose selection: same as selectionPaths(), but in thumbnail view falls back
+// to the keyboard-focused row when nothing is multi-selected — so Delete and
+// run-action behave on "whatever the user is looking at" rather than refusing.
+QStringList MainWindow::currentInputs() const {
+    QStringList paths = selectionPaths();
+    if (paths.isEmpty() && inThumbnailView()) {
         const QString p = m_thumbView->pathAt(m_thumbView->currentRow());
         if (!p.isEmpty()) paths << p;
     }
@@ -240,6 +254,40 @@ void MainWindow::deleteCurrentInputs() {
     reload();
 }
 
+void MainWindow::copySelectionToClipboard() {
+    // Strict selection — unlike Delete and run-action (which use currentInputs()
+    // and fall back to the focused row), Ctrl+C after deselecting reports
+    // "Nothing to copy" rather than silently grabbing the focused thumbnail.
+    const QStringList inputs = selectionPaths();
+    if (inputs.isEmpty()) {
+        statusBar()->showMessage("Nothing to copy", 3000);
+        return;
+    }
+
+    auto *mime = new QMimeData;
+    QList<QUrl> urls;
+    urls.reserve(inputs.size());
+    for (const QString &p : inputs) urls << QUrl::fromLocalFile(p);
+    mime->setUrls(urls);
+
+    QString message;
+    if (inputs.size() == 1) {
+        const QString name = QFileInfo(inputs.first()).fileName();
+        const QImage img = readImage(inputs.first());
+        if (!img.isNull()) {
+            mime->setImageData(img);
+            message = QString("Copied %1 to clipboard").arg(name);
+        } else {
+            message = QString("Copied %1 to clipboard — image decode failed").arg(name);
+        }
+    } else {
+        message = QString("Copied %1 images to clipboard").arg(inputs.size());
+    }
+
+    QApplication::clipboard()->setMimeData(mime);
+    statusBar()->showMessage(message, 5000);
+}
+
 void MainWindow::returnFocusToView() {
     if (inThumbnailView()) m_thumbView->setFocus();
     else                   m_imageView->setFocus();
@@ -283,6 +331,13 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     // While the user is typing in the action bar's search field, leave the
     // event alone — no vim translation, no view shortcuts.
     if (m_actionPane->isInputFocused()) return false;
+
+    // Ctrl+C copies the current selection. Placed after the input-focused
+    // guard so the action bar's line edit keeps its native text-copy.
+    if (origKey == Qt::Key_C && (origMods & Qt::ControlModifier)) {
+        copySelectionToClipboard();
+        return true;
+    }
 
     // 'q' (or Shift+Q) closes the window from either view; placed after the
     // input-focused guard so typing 'q' into the filter just types a letter.

@@ -42,6 +42,7 @@ basics are shown.
 ### Anywhere
 
 - `Ctrl+P` — focus the action bar (type to filter, `Enter` runs, `Esc`/`Tab` dismiss)
+- `Ctrl+C` — copy the current selection to the clipboard (file URL + pixels for a single image; URLs only for many)
 - `Delete` / `d d` — move the current selection to trash (with confirmation)
 - `F5` — re-scan the source directory
 - `q` — quit
