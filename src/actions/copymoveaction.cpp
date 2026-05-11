@@ -12,7 +12,7 @@ bool CopyMoveAction::configure(QWidget *parent, const QStringList &inputs, const
     QDialog dlg(parent);
     dlg.setWindowTitle("Copy or move");
 
-    auto shell = beginActionDialog(&dlg, inputs);
+    ActionDialogBuilder b(&dlg, inputs);
 
     auto *copyRadio = new QRadioButton("Copy", &dlg);
     auto *moveRadio = new QRadioButton("Move", &dlg);
@@ -23,10 +23,9 @@ bool CopyMoveAction::configure(QWidget *parent, const QStringList &inputs, const
     group->addButton(copyRadio, 0);
     group->addButton(moveRadio, 1);
 
-    shell.form->addRow("Mode", copyRadio);
-    shell.form->addRow("",     moveRadio);
-
-    finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
+    b.addRow("Mode", copyRadio);
+    b.addRow("",     moveRadio);
+    b.addOutputControls(defaultOutDir, m_overwrite);
 
     // Default the output subdir based on the chosen mode (copy/ vs move/).
     // Auto-rename when the user toggles, but only if they haven't manually
@@ -37,23 +36,22 @@ bool CopyMoveAction::configure(QWidget *parent, const QStringList &inputs, const
     else                   srcDir = QFileInfo(defaultOutDir).path();
     const QString copyDir = srcDir + "/copy";
     const QString moveDir = srcDir + "/move";
-    shell.outDirEdit->setText(m_mode == Mode::Move ? moveDir : copyDir);
+    b.outDirEdit()->setText(m_mode == Mode::Move ? moveDir : copyDir);
 
     QObject::connect(copyRadio, &QRadioButton::toggled, &dlg,
-        [outEdit = shell.outDirEdit, copyDir, moveDir](bool on) {
+        [outEdit = b.outDirEdit(), copyDir, moveDir](bool on) {
             if (on && outEdit->text() == moveDir) outEdit->setText(copyDir);
         });
     QObject::connect(moveRadio, &QRadioButton::toggled, &dlg,
-        [outEdit = shell.outDirEdit, copyDir, moveDir](bool on) {
+        [outEdit = b.outDirEdit(), copyDir, moveDir](bool on) {
             if (on && outEdit->text() == copyDir) outEdit->setText(moveDir);
         });
 
-    if (dlg.exec() != QDialog::Accepted) return false;
-    const auto sh = readShellResults(shell);
-    if (!sh) return false;
+    const auto r = b.exec();
+    if (!r.accepted) return false;
     m_mode      = (group->checkedId() == 1 ? Mode::Move : Mode::Copy);
-    m_outDir    = sh->outDir;
-    m_overwrite = sh->overwrite;
+    m_outDir    = r.outDir;
+    m_overwrite = r.overwrite;
     return true;
 }
 

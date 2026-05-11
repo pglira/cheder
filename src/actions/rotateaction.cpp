@@ -13,7 +13,7 @@ bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const Q
     QDialog dlg(parent);
     dlg.setWindowTitle("Rotate");
 
-    auto shell = beginActionDialog(&dlg, inputs);
+    ActionDialogBuilder b(&dlg, inputs);
 
     auto *cw   = new QRadioButton("90° clockwise", &dlg);
     auto *ccw  = new QRadioButton("90° counter-clockwise", &dlg);
@@ -25,18 +25,16 @@ bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const Q
     group->addButton(ccw, -90);
     group->addButton(flip, 180);
 
-    shell.form->addRow("Angle", cw);
-    shell.form->addRow("",      ccw);
-    shell.form->addRow("",      flip);
+    b.addRow("Angle", cw);
+    b.addRow("",      ccw);
+    b.addRow("",      flip);
+    b.addOutputControls(defaultOutDir, m_overwrite);
 
-    finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
-
-    if (dlg.exec() != QDialog::Accepted) return false;
-    const auto sh = readShellResults(shell);
-    if (!sh) return false;
+    const auto r = b.exec();
+    if (!r.accepted) return false;
     m_angle     = group->checkedId();
-    m_outDir    = sh->outDir;
-    m_overwrite = sh->overwrite;
+    m_outDir    = r.outDir;
+    m_overwrite = r.overwrite;
     return true;
 }
 

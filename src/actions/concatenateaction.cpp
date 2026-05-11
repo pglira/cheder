@@ -116,7 +116,7 @@ bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, co
     QDialog dlg(parent);
     dlg.setWindowTitle("Concatenate");
 
-    auto shell = beginActionDialog(&dlg, inputs, /*resizable=*/true);
+    ActionDialogBuilder b(&dlg, inputs, /*resizable=*/true);
 
     auto *orientBox = new QComboBox(&dlg);
     orientBox->addItem("Horizontal", static_cast<int>(Orientation::Horizontal));
@@ -283,23 +283,21 @@ bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, co
         filenameEdit->setText(fi.completeBaseName() + ".png");
     });
 
-    shell.form->addRow("Orientation", orientBox);
-    shell.form->addRow(targetLabel,   targetSpin);
-    shell.form->addRow("Spacing",     spacingSpin);
-    shell.form->addRow("Background",  bgBox);
-    shell.form->addRow("Order",       listRow);
-    shell.form->addRow("Preview",     previewLabel);
+    b.addRow("Orientation", orientBox);
+    b.addRow(targetLabel,   targetSpin);
+    b.addRow("Spacing",     spacingSpin);
+    b.addRow("Background",  bgBox);
+    b.addRow("Order",       listRow);
+    b.addRow("Preview",     previewLabel);
     // "Output file" sits immediately above "Output directory" (added next by
-    // finishActionDialog), so the two output-target rows read as a pair.
-    shell.form->addRow("Output file", filenameEdit);
-
-    finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
+    // addOutputControls), so the two output-target rows read as a pair.
+    b.addRow("Output file", filenameEdit);
+    b.addOutputControls(defaultOutDir, m_overwrite);
 
     refreshPreview();
 
-    if (dlg.exec() != QDialog::Accepted) return false;
-    const auto sh = readShellResults(shell);
-    if (!sh) return false;
+    const auto r = b.exec();
+    if (!r.accepted) return false;
 
     const QString filename = filenameEdit->text().trimmed();
     if (filename.isEmpty()) return false;
@@ -309,9 +307,9 @@ bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, co
     m_spacing       = spacingSpin->value();
     m_bg            = static_cast<Bg>(bgBox->currentData().toInt());
     m_orderedInputs = orderedPathsFrom(inputsList);
-    m_outDir        = sh->outDir;
+    m_outDir        = r.outDir;
     m_outFilename   = filename;
-    m_overwrite     = sh->overwrite;
+    m_overwrite     = r.overwrite;
     return true;
 }
 

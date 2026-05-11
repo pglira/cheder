@@ -11,7 +11,7 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
     QDialog dlg(parent);
     dlg.setWindowTitle("Resize");
 
-    auto shell = beginActionDialog(&dlg, inputs);
+    ActionDialogBuilder b(&dlg, inputs);
 
     auto *modeBox = new QComboBox(&dlg);
     modeBox->addItem("Longest edge (px)", static_cast<int>(Mode::LongestEdgePx));
@@ -38,19 +38,17 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
     syncSpinRange();
     QObject::connect(modeBox, &QComboBox::currentIndexChanged, &dlg, syncSpinRange);
 
-    shell.form->addRow("Mode",  modeBox);
-    shell.form->addRow("Value", valueSpin);
+    b.addRow("Mode",  modeBox);
+    b.addRow("Value", valueSpin);
+    b.addOutputControls(defaultOutDir, m_overwrite);
 
-    finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
-
-    if (dlg.exec() != QDialog::Accepted) return false;
-    const auto sh = readShellResults(shell);
-    if (!sh) return false;
+    const auto r = b.exec();
+    if (!r.accepted) return false;
     m_mode = static_cast<Mode>(modeBox->currentData().toInt());
     if (m_mode == Mode::ScalePercent) m_percent = valueSpin->value();
     else                              m_pixels  = valueSpin->value();
-    m_outDir    = sh->outDir;
-    m_overwrite = sh->overwrite;
+    m_outDir    = r.outDir;
+    m_overwrite = r.overwrite;
     return true;
 }
 

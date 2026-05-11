@@ -50,7 +50,7 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     QDialog dlg(parent);
     dlg.setWindowTitle("Caption");
 
-    auto shell = beginActionDialog(&dlg, inputs, /*resizable=*/true);
+    ActionDialogBuilder b(&dlg, inputs, /*resizable=*/true);
 
     auto *captionEdit = new QLineEdit(m_caption, &dlg);
     captionEdit->setPlaceholderText("Caption text (required)");
@@ -79,12 +79,12 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     sizeSpin->setSuffix(" pt");
     sizeSpin->setValue(m_pointSize);
 
-    shell.form->addRow("Caption",    captionEdit);
-    shell.form->addRow("Position",   positionBox);
-    shell.form->addRow("Background", bgBox);
-    shell.form->addRow("Text color", fgBox);
-    shell.form->addRow("Font",       fontBox);
-    shell.form->addRow("Size",       sizeSpin);
+    b.addRow("Caption",    captionEdit);
+    b.addRow("Position",   positionBox);
+    b.addRow("Background", bgBox);
+    b.addRow("Text color", fgBox);
+    b.addRow("Font",       fontBox);
+    b.addRow("Size",       sizeSpin);
 
     QImage srcOrig;
     if (!inputs.isEmpty()) srcOrig = readImage(inputs.first());
@@ -96,7 +96,7 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     previewLabel->setFrameShape(QFrame::StyledPanel);
     if (srcOrig.isNull())
         previewLabel->setText("(preview unavailable)");
-    shell.form->addRow(previewLabel);
+    b.addRow(previewLabel);
 
     // Render at the source's full resolution with the configured pointSize.
     // Display-time scaling is delegated to PreviewLabel, which fits the
@@ -127,21 +127,20 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     QObject::connect(sizeSpin,    &QSpinBox::valueChanged,         &dlg, updatePreview);
     updatePreview();
 
-    finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
+    b.addOutputControls(defaultOutDir, m_overwrite);
 
-    if (dlg.exec() != QDialog::Accepted) return false;
+    const auto r = b.exec();
+    if (!r.accepted) return false;
     const QString caption = captionEdit->text();
     if (caption.isEmpty()) return false;
-    const auto sh = readShellResults(shell);
-    if (!sh) return false;
     m_caption    = caption;
     m_position   = static_cast<Position>(positionBox->currentData().toInt());
     m_bg         = static_cast<Bg>(bgBox->currentData().toInt());
     m_fg         = static_cast<Fg>(fgBox->currentData().toInt());
     m_fontFamily = fontBox->currentFont().family();
     m_pointSize  = sizeSpin->value();
-    m_outDir     = sh->outDir;
-    m_overwrite  = sh->overwrite;
+    m_outDir     = r.outDir;
+    m_overwrite  = r.overwrite;
     return true;
 }
 
