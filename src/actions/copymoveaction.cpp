@@ -2,6 +2,7 @@
 
 #include "actionlogger.h"
 #include "actionwidgets.h"
+#include "writetarget.h"
 
 #include <QButtonGroup>
 #include <QFile>
@@ -62,22 +63,9 @@ QString CopyMoveAction::applyOne(const QString &input, ActionLogger *logger) {
         });
     }
 
-    // Move: try a direct rename to the resolved final path first — that's
-    // atomic on the same filesystem. On cross-device failure, copy to a
-    // temp via writeOne and then remove the source.
+    // Move: resolve under our overwrite policy, then hand off to the
+    // shared atomic-move helper (rename, with cross-fs copy+delete fallback).
     const QString finalPath = resolveOutputPath(input, logger);
     if (finalPath.isEmpty()) return {};
-
-    if (QFile::exists(finalPath)) QFile::remove(finalPath);
-    if (QFile::rename(input, finalPath)) {
-        if (logger) logger->info(QString("moved %1 -> %2").arg(input, finalPath));
-        return finalPath;
-    }
-
-    const QString out = writeOne(input, logger, [&](const QString &tempPath) {
-        return QFile::copy(input, tempPath);
-    });
-    if (out.isEmpty()) return {};
-    QFile::remove(input);
-    return out;
+    return WriteTarget::move(input, finalPath, logger, "moved");
 }

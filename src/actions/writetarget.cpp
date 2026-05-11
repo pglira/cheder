@@ -2,6 +2,7 @@
 
 #include "actionlogger.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 
@@ -79,6 +80,30 @@ QString write(const QString &finalPath,
 
     if (logger) logger->info(QString("wrote %1").arg(finalPath));
     return finalPath;
+}
+
+QString move(const QString &input,
+             const QString &finalPath,
+             ActionLogger *logger,
+             const char *verb) {
+    QDir().mkpath(QFileInfo(finalPath).absolutePath());
+    // QFile::rename refuses to overwrite, so clear any pre-existing target
+    // (the caller's overwrite policy has already decided we're allowed to).
+    if (QFile::exists(finalPath)) QFile::remove(finalPath);
+    if (QFile::rename(input, finalPath)) {
+        if (logger) logger->info(QString("%1 %2 -> %3")
+                                     .arg(QString::fromLatin1(verb),
+                                          input, finalPath));
+        return finalPath;
+    }
+    // Same-fs rename failed (typically cross-fs): copy via the .part protocol
+    // so the source is intact until the destination is finalised, then unlink
+    // the source.
+    const QString out = write(finalPath, logger,
+        [&input](const QString &temp) { return QFile::copy(input, temp); });
+    if (out.isEmpty()) return {};
+    QFile::remove(input);
+    return out;
 }
 
 }  // namespace WriteTarget

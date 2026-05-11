@@ -46,4 +46,14 @@ QString write(const QString &finalPath,
               ActionLogger *logger,
               std::function<bool(const QString &tempPath)> writer);
 
+// Move `input` to `finalPath`: try a same-fs atomic QFile::rename first;
+// on failure (e.g. cross-fs), fall back to copy-via-.part-then-remove so a
+// partial write can't clobber the source. Returns `finalPath` on success
+// (logged as "<verb> <src> -> <dst>"), {} on failure. The parent of
+// `finalPath` is created if needed.
+QString move(const QString &input,
+             const QString &finalPath,
+             ActionLogger *logger,
+             const char *verb = "moved");
+
 }  // namespace WriteTarget
