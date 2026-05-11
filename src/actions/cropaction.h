@@ -9,6 +9,7 @@ public:
     QString id() const override          { return "crop"; }
     QString name() const override        { return "Crop"; }
     QString description() const override { return "Crop one or more same-size images to the same rectangle"; }
+    QKeySequence shortcut() const override { return QKeySequence("Alt+C"); }
 
     bool acceptsCount(int n) const override { return n >= 1; }
 

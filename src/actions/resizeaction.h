@@ -7,6 +7,7 @@ public:
     QString id() const override          { return "resize"; }
     QString name() const override        { return "Resize"; }
     QString description() const override { return "Scale by longest edge or percent"; }
+    QKeySequence shortcut() const override { return QKeySequence("Alt+S"); }
 
     bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
 

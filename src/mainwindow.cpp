@@ -166,6 +166,19 @@ void MainWindow::wireKeyBindings() {
     bindImage(Qt::Key_I,     [this] {
         m_infoPanel->setVisible(!m_infoPanel->isVisible());
     });
+
+    // Each Action can declare its own QKeySequence (Alt+R, Alt+S, etc.).
+    // Wire it to runAction(); runAction's existing acceptsCount check handles
+    // the wrong-input-count case with a status message, so shortcuts at the
+    // wrong selection size fail soft rather than firing the dialog.
+    for (Action *a : m_actions->all()) {
+        const QKeySequence seq = a->shortcut();
+        if (seq.isEmpty()) continue;
+        const auto combo = seq[0];
+        m_keys.bind({combo.key(), combo.keyboardModifiers(), {}, Mode::Anywhere,
+                     /*fireWhileInputFocused=*/true,
+                     [this, a] { runAction(a); }});
+    }
 }
 
 MainWindow::~MainWindow() = default;

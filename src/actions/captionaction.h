@@ -9,6 +9,7 @@ public:
     QString id() const override          { return "caption"; }
     QString name() const override        { return "Caption"; }
     QString description() const override { return "Add a text caption above or below a single image"; }
+    QKeySequence shortcut() const override { return QKeySequence("Alt+T"); }
 
     // Captioning only makes sense one image at a time — the dialog presets a
     // single caption, font, and size; running it across a multi-selection

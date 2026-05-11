@@ -7,6 +7,7 @@ public:
     QString id() const override          { return "copy-or-move"; }
     QString name() const override        { return "Copy or move"; }
     QString description() const override { return "Copy or move files to a directory"; }
+    QKeySequence shortcut() const override { return QKeySequence("Alt+M"); }
 
     bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
 

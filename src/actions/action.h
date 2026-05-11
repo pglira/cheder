@@ -2,6 +2,7 @@
 
 #include "writetarget.h"
 
+#include <QKeySequence>
 #include <QString>
 #include <QStringList>
 
@@ -22,6 +23,13 @@ public:
     virtual QString id() const = 0;
     virtual QString name() const = 0;
     virtual QString description() const { return {}; }
+
+    // Optional global shortcut. Empty = no shortcut. Must be a SINGLE
+    // keystroke (Alt+R, Ctrl+K, etc.) — only seq[0] is consulted by both the
+    // KeyDispatcher binding and the ActionBar label. Multi-keystroke chord
+    // sequences are not supported. No collision check across actions; if
+    // two actions declare the same shortcut, the first-registered wins.
+    virtual QKeySequence shortcut() const { return {}; }
 
     virtual bool acceptsCount(int n) const = 0;
 

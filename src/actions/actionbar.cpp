@@ -4,6 +4,7 @@
 #include "actionregistry.h"
 
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
@@ -64,9 +65,12 @@ void ActionBar::rebuildList(const QString &filter) {
                           || a->description().toLower().contains(needle);
             if (!hit) continue;
         }
-        const QString label = a->description().isEmpty()
-                                  ? a->name()
-                                  : a->name() + " — " + a->description();
+        QString label = a->description().isEmpty()
+                            ? a->name()
+                            : a->name() + " — " + a->description();
+        const QKeySequence seq = a->shortcut();
+        if (!seq.isEmpty())
+            label += "  [" + seq.toString(QKeySequence::NativeText) + "]";
         auto *item = new QListWidgetItem(label, m_list);
         item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void *>(a)));
     }

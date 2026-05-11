@@ -11,6 +11,7 @@ public:
     QString id() const override          { return "concatenate"; }
     QString name() const override        { return "Concatenate"; }
     QString description() const override { return "Concatenate images horizontally or vertically"; }
+    QKeySequence shortcut() const override { return QKeySequence("Alt+N"); }
 
     bool acceptsCount(int n) const override { return n >= 2; }
 

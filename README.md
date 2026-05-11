@@ -52,12 +52,16 @@ basics are shown.
 The action bar at the bottom of the window lists actions; type to filter,
 `Enter` to invoke. Built-in:
 
-- **Rotate** — 90° CW / CCW / 180°
-- **Resize** — by longest edge (px) or scale (%)
-- **Caption** — add a text caption above or below a single image (live preview)
-- **Concatenate** — stitch ≥2 selected images horizontally or vertically (target axis, spacing, background)
-- **Crop** — interactive rectangle on a preview, with optional aspect-ratio constraint; applies the same rect to every selected image (selection must be same-size)
-- **Copy or move** — duplicate or relocate to a chosen directory
+- **Rotate** (`Alt+R`) — 90° CW / CCW / 180°
+- **Resize** (`Alt+S`) — by longest edge (px) or scale (%)
+- **Caption** (`Alt+T`) — add a text caption above or below a single image (live preview)
+- **Concatenate** (`Alt+N`) — stitch ≥2 selected images horizontally or vertically (target axis, spacing, background)
+- **Crop** (`Alt+C`) — interactive rectangle on a preview, with optional aspect-ratio constraint; applies the same rect to every selected image (selection must be same-size)
+- **Copy or move** (`Alt+M`) — duplicate or relocate to a chosen directory
+
+Each shortcut opens the corresponding action's dialog directly from any view.
+Selections that the action can't accept (e.g. `Alt+N` on a single image) fall
+back to a status-bar message instead of opening.
 
 Each action writes to a directory you pick in its dialog (defaults to
 `<source-dir>/<action-id>/`). After a successful run the source directory is
