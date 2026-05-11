@@ -1,7 +1,7 @@
 #include "captionaction.h"
 
-#include "../imageio.h"
 #include "actionwidgets.h"
+#include "imageio.h"
 
 #include <QFont>
 #include <QFontComboBox>
@@ -130,14 +130,18 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
-    if (!applyShellResults(shell, *this)) return false;
-    m_caption = captionEdit->text();
-    if (m_caption.isEmpty()) return false;
+    const QString caption = captionEdit->text();
+    if (caption.isEmpty()) return false;
+    const auto sh = readShellResults(shell);
+    if (!sh) return false;
+    m_caption    = caption;
     m_position   = static_cast<Position>(positionBox->currentData().toInt());
     m_bg         = static_cast<Bg>(bgBox->currentData().toInt());
     m_fg         = static_cast<Fg>(fgBox->currentData().toInt());
     m_fontFamily = fontBox->currentFont().family();
     m_pointSize  = sizeSpin->value();
+    m_outDir     = sh->outDir;
+    m_overwrite  = sh->overwrite;
     return true;
 }
 

@@ -1,7 +1,7 @@
 #include "resizeaction.h"
 
-#include "../imageio.h"
 #include "actionwidgets.h"
+#include "imageio.h"
 
 #include <QImage>
 #include <QImageWriter>
@@ -44,10 +44,13 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
     finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
-    if (!applyShellResults(shell, *this)) return false;
+    const auto sh = readShellResults(shell);
+    if (!sh) return false;
     m_mode = static_cast<Mode>(modeBox->currentData().toInt());
     if (m_mode == Mode::ScalePercent) m_percent = valueSpin->value();
     else                              m_pixels  = valueSpin->value();
+    m_outDir    = sh->outDir;
+    m_overwrite = sh->overwrite;
     return true;
 }
 

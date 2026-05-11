@@ -30,10 +30,9 @@
 
 MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     : QMainWindow(parent),
-      m_fileModel(std::make_unique<FileListModel>()),
+      m_fileModel(std::make_unique<FileListModel>(files)),
       m_actions(std::make_unique<ActionRegistry>()) {
     if (!files.isEmpty()) m_sourceDir = QFileInfo(files.first()).absolutePath();
-    m_fileModel->setFiles(files);
 
     m_stack = new QStackedWidget(this);
 
@@ -249,17 +248,10 @@ void MainWindow::returnFocusToView() {
 void MainWindow::reload() {
     if (m_sourceDir.isEmpty()) return;
 
-    const QString currentImagePath = m_imageView->currentPath();
-
-    // FileListModel emits filesChanged, which the views observe. ImageView
-    // clamps its index automatically; we re-locate the previously-shown
-    // image below if it survived.
+    // FileListModel emits filesChanged; ImageView preserves its current
+    // image by path (or clamps the index if the file is gone) and
+    // ThumbnailView preserves selection.
     m_fileModel->setFiles(listImagesInDir(m_sourceDir));
-
-    if (!currentImagePath.isEmpty()) {
-        const int idx = m_fileModel->indexOf(currentImagePath);
-        if (idx >= 0) m_imageView->setIndex(idx);
-    }
 
     statusBar()->showMessage(QString("Reloaded — %1 image(s)").arg(m_fileModel->count()), 2500);
     updateTitle();

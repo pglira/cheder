@@ -11,7 +11,8 @@
 class FileListModel : public QObject {
     Q_OBJECT
 public:
-    explicit FileListModel(QObject *parent = nullptr) : QObject(parent) {}
+    explicit FileListModel(const QStringList &files = {}, QObject *parent = nullptr)
+        : QObject(parent), m_files(files) {}
 
     const QStringList &files() const { return m_files; }
     int     count()   const { return m_files.size(); }

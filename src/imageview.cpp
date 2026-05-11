@@ -26,6 +26,20 @@ ImageView::ImageView(FileListModel *model, QWidget *parent)
 }
 
 void ImageView::onFilesChanged() {
+    // Identity-first: if the previously-shown image is still in the list,
+    // follow it to its (possibly shifted) new index. Only fall back to
+    // clamping the old index when the path is gone (e.g. it was deleted or
+    // moved). Without this, reload() loads the wrong image once via the
+    // signal and again via the explicit setIndex() that callers use to
+    // restore position.
+    if (!m_currentPath.isEmpty()) {
+        const int newIdx = m_model->indexOf(m_currentPath);
+        if (newIdx >= 0) {
+            m_index = newIdx;
+            loadCurrent();
+            return;
+        }
+    }
     const int n = m_model->count();
     if (m_index >= n) m_index = n == 0 ? 0 : n - 1;
     if (m_index < 0)  m_index = 0;
@@ -38,10 +52,6 @@ void ImageView::setIndex(int index) {
     if (index >= m_model->count()) index = m_model->count() - 1;
     m_index = index;
     loadCurrent();
-}
-
-QString ImageView::currentPath() const {
-    return m_model->at(m_index);
 }
 
 void ImageView::next() {
@@ -57,16 +67,16 @@ void ImageView::previous() {
 }
 
 void ImageView::loadCurrent() {
-    const QString path = m_model->at(m_index);
-    if (path.isEmpty()) {
+    m_currentPath = m_model->at(m_index);
+    if (m_currentPath.isEmpty()) {
         m_original = QPixmap();
         m_label->clear();
         return;
     }
-    const QImage img = readImage(path);
+    const QImage img = readImage(m_currentPath);
     m_original = img.isNull() ? QPixmap() : QPixmap::fromImage(img);
     updatePixmap();
-    emit currentChanged(m_index, path);
+    emit currentChanged(m_index, m_currentPath);
 }
 
 void ImageView::updatePixmap() {

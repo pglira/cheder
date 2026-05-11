@@ -13,7 +13,7 @@ public:
 
     void setIndex(int index);
     int  index() const { return m_index; }
-    QString currentPath() const;
+    QString currentPath() const { return m_currentPath; }
 
     void next();
     void previous();
@@ -32,5 +32,6 @@ private:
     QLabel *m_label;
     FileListModel *m_model;
     int m_index = 0;
+    QString m_currentPath;  // path for the image at m_index, "" if none
     QPixmap m_original;
 };

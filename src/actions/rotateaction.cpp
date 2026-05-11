@@ -1,7 +1,7 @@
 #include "rotateaction.h"
 
-#include "../imageio.h"
 #include "actionwidgets.h"
+#include "imageio.h"
 
 #include <QButtonGroup>
 #include <QImage>
@@ -32,8 +32,11 @@ bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const Q
     finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
-    if (!applyShellResults(shell, *this)) return false;
-    m_angle = group->checkedId();
+    const auto sh = readShellResults(shell);
+    if (!sh) return false;
+    m_angle     = group->checkedId();
+    m_outDir    = sh->outDir;
+    m_overwrite = sh->overwrite;
     return true;
 }
 

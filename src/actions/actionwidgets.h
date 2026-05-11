@@ -15,6 +15,8 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include <optional>
+
 // Set as a minimum so the dialog opens wide but the user can grow it.
 constexpr int kActionDialogMinWidth = 800;
 
@@ -135,14 +137,17 @@ inline BatchAction::Overwrite overwriteFromBox(QComboBox *box) {
     return static_cast<BatchAction::Overwrite>(box->currentData().toInt());
 }
 
-// Copies the dialog's output dir + overwrite policy back onto `action`.
-// Returns false if the user accepted with an empty output directory (treated
-// the same as cancel by callers). Every action does these three lines after
-// dlg.exec() succeeds, so factor them out.
-inline bool applyShellResults(const ActionDialogShell &shell, BatchAction &action) {
+// Read the action-dialog shell's output dir + overwrite policy, or return
+// nullopt if the user accepted with an empty directory (treated by callers
+// the same as cancel). Pure read — assignment back onto the action's fields
+// is the action's choice, so configure() can validate other inputs first
+// and avoid mutating state on a return-false path.
+struct ShellResults {
+    QString                outDir;
+    BatchAction::Overwrite overwrite;
+};
+inline std::optional<ShellResults> readShellResults(const ActionDialogShell &shell) {
     const QString outDir = shell.outDirEdit->text().trimmed();
-    if (outDir.isEmpty()) return false;
-    action.setOutDir(outDir);
-    action.setOverwrite(overwriteFromBox(shell.overwriteBox));
-    return true;
+    if (outDir.isEmpty()) return std::nullopt;
+    return ShellResults{outDir, overwriteFromBox(shell.overwriteBox)};
 }
