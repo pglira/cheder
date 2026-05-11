@@ -1,6 +1,7 @@
 #pragma once
 
 #include "action.h"
+#include "writetarget.h"
 
 #include <QImage>
 #include <QStringList>
@@ -35,5 +36,5 @@ private:
     QStringList m_orderedInputs;  // user-reordered in the dialog; apply() uses this
     QString     m_outDir;
     QString     m_outFilename = "concat.png";
-    BatchAction::Overwrite m_overwrite = BatchAction::Overwrite::Overwrite;
+    WriteTarget::Overwrite m_overwrite = WriteTarget::Overwrite::Overwrite;
 };

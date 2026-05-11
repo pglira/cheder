@@ -3,6 +3,7 @@
 #include "actionlogger.h"
 #include "actionwidgets.h"
 #include "imageio.h"
+#include "writetarget.h"
 
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
@@ -347,20 +348,20 @@ QStringList ConcatenateAction::apply(const QStringList &inputs, ActionLogger *lo
         return {};
     }
 
-    const auto resolved = BatchAction::resolveDestPath(m_outDir, m_outFilename,
-                                                       m_overwrite, logger);
-    if (resolved.status != BatchAction::ResolveStatus::Ok) {
+    const auto resolved = WriteTarget::resolve(m_outDir, m_outFilename,
+                                               m_overwrite, logger);
+    if (resolved.status != WriteTarget::ResolveStatus::Ok) {
         if (logger) logger->endRun(name(),
                                    /*written=*/0,
-                                   /*skipped=*/resolved.status == BatchAction::ResolveStatus::Skip ? 1 : 0,
-                                   /*failed=*/ resolved.status == BatchAction::ResolveStatus::Failed ? 1 : 0);
+                                   /*skipped=*/resolved.status == WriteTarget::ResolveStatus::Skip ? 1 : 0,
+                                   /*failed=*/ resolved.status == WriteTarget::ResolveStatus::Failed ? 1 : 0);
         return {};
     }
 
     // Only now is the destination committed — don't create the output dir if
     // the resolve above ended in Skip or Failed.
     QDir().mkpath(m_outDir);
-    const QString finalPath = BatchAction::writeAtomically(resolved.path, logger,
+    const QString finalPath = WriteTarget::write(resolved.path, logger,
         [&rendered](const QString &tempPath) {
             QImageWriter writer(tempPath);
             return writer.write(rendered);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "action.h"
+#include "writetarget.h"
 
 #include <QComboBox>
 #include <QDialog>
@@ -105,18 +105,18 @@ inline ActionDialogShell beginActionDialog(QDialog *dlg, const QStringList &inpu
 
 inline void finishActionDialog(ActionDialogShell &shell, QDialog *dlg,
                                const QString &defaultOutDir,
-                               BatchAction::Overwrite defaultOverwrite =
-                                   BatchAction::Overwrite::Overwrite) {
+                               WriteTarget::Overwrite defaultOverwrite =
+                                   WriteTarget::Overwrite::Overwrite) {
     shell.outDirEdit = new QLineEdit(defaultOutDir, dlg);
     shell.form->addRow("Output directory", outputDirField(shell.outDirEdit, dlg));
 
     shell.overwriteBox = new QComboBox(dlg);
     shell.overwriteBox->addItem("Overwrite existing files",
-                                static_cast<int>(BatchAction::Overwrite::Overwrite));
+                                static_cast<int>(WriteTarget::Overwrite::Overwrite));
     shell.overwriteBox->addItem("Skip existing files",
-                                static_cast<int>(BatchAction::Overwrite::Skip));
+                                static_cast<int>(WriteTarget::Overwrite::Skip));
     shell.overwriteBox->addItem("Rename (foo_1.jpg, foo_2.jpg, ...)",
-                                static_cast<int>(BatchAction::Overwrite::Rename));
+                                static_cast<int>(WriteTarget::Overwrite::Rename));
     for (int i = 0; i < shell.overwriteBox->count(); ++i) {
         if (shell.overwriteBox->itemData(i).toInt() == static_cast<int>(defaultOverwrite)) {
             shell.overwriteBox->setCurrentIndex(i);
@@ -133,8 +133,8 @@ inline void finishActionDialog(ActionDialogShell &shell, QDialog *dlg,
         vbox->addWidget(buttons);
 }
 
-inline BatchAction::Overwrite overwriteFromBox(QComboBox *box) {
-    return static_cast<BatchAction::Overwrite>(box->currentData().toInt());
+inline WriteTarget::Overwrite overwriteFromBox(QComboBox *box) {
+    return static_cast<WriteTarget::Overwrite>(box->currentData().toInt());
 }
 
 // Read the action-dialog shell's output dir + overwrite policy, or return
@@ -144,7 +144,7 @@ inline BatchAction::Overwrite overwriteFromBox(QComboBox *box) {
 // and avoid mutating state on a return-false path.
 struct ShellResults {
     QString                outDir;
-    BatchAction::Overwrite overwrite;
+    WriteTarget::Overwrite overwrite;
 };
 inline std::optional<ShellResults> readShellResults(const ActionDialogShell &shell) {
     const QString outDir = shell.outDirEdit->text().trimmed();
