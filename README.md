@@ -32,17 +32,19 @@ basics are shown.
 - arrow keys / `h j k l` — move within the grid
 - `g g` / `G` — first / last item
 - `+` / `-` / `Ctrl+wheel` — change thumbnail size
-- `i` — toggle the info panel
 
 ### Image view
 
 - arrow keys / `n` / `p` — next / previous image
+- `i` — toggle the info panel
 - `Tab` / `Esc` — back to the thumbnail view
 
 ### Anywhere
 
-- `:` — focus the action bar (type to filter, `Enter` runs, `Esc`/`Tab` dismiss)
+- `Ctrl+P` — focus the action bar (type to filter, `Enter` runs, `Esc`/`Tab` dismiss)
+- `Delete` / `d d` — move the current selection to trash (with confirmation)
 - `F5` — re-scan the source directory
+- `q` — quit
 
 ## Actions
 
@@ -51,6 +53,7 @@ The action bar at the bottom of the window lists actions; type to filter,
 
 - **Rotate** — 90° CW / CCW / 180°
 - **Resize** — by longest edge (px) or scale (%)
+- **Caption** — add a text caption above or below a single image (live preview)
 - **Copy or move** — duplicate or relocate to a chosen directory
 
 Each action writes to a directory you pick in its dialog (defaults to
