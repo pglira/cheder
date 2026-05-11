@@ -5,6 +5,7 @@
 
 #include <QImage>
 #include <QLabel>
+#include <QMovie>
 #include <QResizeEvent>
 #include <QVBoxLayout>
 
@@ -24,6 +25,8 @@ ImageView::ImageView(FileListModel *model, QWidget *parent)
     connect(m_model, &FileListModel::filesChanged, this, &ImageView::onFilesChanged);
     onFilesChanged();
 }
+
+ImageView::~ImageView() = default;
 
 void ImageView::onFilesChanged() {
     // Identity-first: if the previously-shown image is still in the list,
@@ -68,18 +71,51 @@ void ImageView::previous() {
 
 void ImageView::loadCurrent() {
     m_currentPath = m_model->at(m_index);
+
+    // Tear down the previous animation (if any) before loading the next path
+    // so a navigation away from a GIF stops its decode/play loop promptly.
+    m_movie.reset();
+    m_label->setMovie(nullptr);
+    m_original = QPixmap();
+
     if (m_currentPath.isEmpty()) {
-        m_original = QPixmap();
         m_label->clear();
         return;
     }
-    const QImage img = readImage(m_currentPath);
-    m_original = img.isNull() ? QPixmap() : QPixmap::fromImage(img);
-    updatePixmap();
+
+    if (isGifPath(m_currentPath)) {
+        m_movie = std::make_unique<QMovie>(m_currentPath);
+        m_movie->setCacheMode(QMovie::CacheAll);
+        if (m_movie->isValid()) {
+            m_label->setStyleSheet("background-color: black;");
+            m_label->setMovie(m_movie.get());
+            applyMovieScale();
+            m_movie->start();
+        } else {
+            m_movie.reset();
+            m_label->setText("Failed to load GIF");
+            m_label->setStyleSheet("background-color: black; color: #888;");
+        }
+    } else {
+        const QImage img = readImage(m_currentPath);
+        m_original = img.isNull() ? QPixmap() : QPixmap::fromImage(img);
+        rescale();
+    }
     emit currentChanged(m_index, m_currentPath);
 }
 
-void ImageView::updatePixmap() {
+void ImageView::applyMovieScale() {
+    // QMovie::frameRect() isn't populated until the first frame is jumped to;
+    // peek the file's dimensions directly so scaling is correct from frame 1.
+    const QSize native = peekImageSize(m_currentPath);
+    if (!native.isValid()) return;
+    QSize target = native;
+    target.scale(m_label->size(), Qt::KeepAspectRatio);
+    m_movie->setScaledSize(target);
+}
+
+void ImageView::rescale() {
+    if (m_movie) { applyMovieScale(); return; }
     if (m_original.isNull()) {
         m_label->setText("Failed to load image");
         m_label->setStyleSheet("background-color: black; color: #888;");
@@ -91,5 +127,5 @@ void ImageView::updatePixmap() {
 
 void ImageView::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
-    updatePixmap();
+    rescale();
 }

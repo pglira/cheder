@@ -1,6 +1,7 @@
 #include "thumbnailview.h"
 
 #include "filelistmodel.h"
+#include "imageio.h"
 #include "thumbnailcache.h"
 
 #include <QIcon>
@@ -32,6 +33,29 @@ QPixmap placeholderPixmap(QSize size) {
     pm.setDevicePixelRatio(1.0);
     pm.fill(kPlaceholderColor);
     return pm;
+}
+
+// Paints a translucent play-triangle badge in the lower-right of `p`'s
+// device so animated-GIF thumbnails are visually distinguishable from
+// still images at a glance.
+void drawAnimatedBadge(QPainter &p, QSize iconSize) {
+    const int badgeSize = std::max(16, iconSize.width() / 6);
+    const QRect badgeRect(iconSize.width()  - badgeSize - 4,
+                          iconSize.height() - badgeSize - 4,
+                          badgeSize, badgeSize);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0, 160));
+    p.drawRoundedRect(badgeRect, 4, 4);
+    p.setBrush(Qt::white);
+    const int cx = badgeRect.center().x();
+    const int cy = badgeRect.center().y();
+    const int s  = badgeSize / 3;
+    QPolygon tri;
+    tri << QPoint(cx - s / 2, cy - s)
+        << QPoint(cx - s / 2, cy + s)
+        << QPoint(cx + s,     cy);
+    p.drawPolygon(tri);
 }
 
 }  // namespace
@@ -143,7 +167,8 @@ void ThumbnailView::loadNext(qint64 generation) {
     if (m_loadIndex >= files.size()) return;
 
     const int row = m_loadIndex++;
-    const QPixmap raw = m_cache->getThumbnail(files.at(row), iconSize());
+    const QString &path = files.at(row);
+    const QPixmap raw = m_cache->getThumbnail(path, iconSize());
     if (generation == m_generation && !raw.isNull()) {
         // Pad to a square iconSize pixmap so every cell is the same size and
         // the icon area in QListView paints predictably.
@@ -153,6 +178,8 @@ void ThumbnailView::loadNext(qint64 generation) {
         QPainter p(&padded);
         p.drawPixmap((iconSize().width()  - raw.width())  / 2,
                      (iconSize().height() - raw.height()) / 2, raw);
+        if (isGifPath(path))
+            drawAnimatedBadge(p, iconSize());
         p.end();
         if (auto *it = item(row)) it->setIcon(QIcon(padded));
     }

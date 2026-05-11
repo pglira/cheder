@@ -23,3 +23,11 @@ inline QSize peekImageSize(const QString &path) {
     reader.setAutoTransform(true);
     return reader.size();
 }
+
+// True when `path` looks like an animated-GIF candidate — detection is by
+// extension only, matching the conventions QMovie uses for format routing.
+// ImageView decides whether to spin up a QMovie; ThumbnailView decides
+// whether to overlay the animated-badge corner on the cached first frame.
+inline bool isGifPath(const QString &path) {
+    return path.endsWith(QLatin1String(".gif"), Qt::CaseInsensitive);
+}
