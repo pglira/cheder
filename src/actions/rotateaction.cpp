@@ -1,10 +1,10 @@
 #include "rotateaction.h"
 
+#include "../imageio.h"
 #include "actionwidgets.h"
 
 #include <QButtonGroup>
 #include <QImage>
-#include <QImageReader>
 #include <QImageWriter>
 #include <QRadioButton>
 #include <QTransform>
@@ -32,18 +32,13 @@ bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const Q
     finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
-
-    m_angle     = group->checkedId();
-    m_outDir    = shell.outDirEdit->text().trimmed();
-    m_overwrite = overwriteFromBox(shell.overwriteBox);
-    if (m_outDir.isEmpty()) return false;
+    if (!applyShellResults(shell, *this)) return false;
+    m_angle = group->checkedId();
     return true;
 }
 
 QString RotateAction::applyOne(const QString &input, ActionLogger *logger) {
-    QImageReader reader(input);
-    reader.setAutoTransform(true);
-    QImage img = reader.read();
+    QImage img = readImage(input);
     if (img.isNull()) return {};
 
     QTransform t;

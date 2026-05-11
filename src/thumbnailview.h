@@ -1,20 +1,26 @@
 #pragma once
 
 #include <QListWidget>
-#include <QStringList>
 
 #include <memory>
 
 class ThumbnailCache;
+class FileListModel;
 
 class ThumbnailView : public QListWidget {
     Q_OBJECT
 public:
-    explicit ThumbnailView(QWidget *parent = nullptr);
+    explicit ThumbnailView(FileListModel *model, QWidget *parent = nullptr);
     ~ThumbnailView() override;
 
-    void setFiles(const QStringList &files);
     int firstSelectedRow() const;
+
+    // Path of the item at `row` (empty if out of range). Reads the UserRole,
+    // which is set when items are built.
+    QString pathAt(int row) const;
+    // Paths of the currently selected items, in row order. Empty if nothing
+    // is selected.
+    QStringList selectedPaths() const;
 
     int thumbnailSize() const;
     void setThumbnailSize(int size);
@@ -29,11 +35,12 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
 
 private:
+    void onFilesChanged();
     void rebuildItems();
     void startLoading();
     void loadNext(qint64 generation);
 
-    QStringList m_files;
+    FileListModel *m_model;
     int m_loadIndex = 0;
     qint64 m_generation = 0;
     std::unique_ptr<ThumbnailCache> m_cache;

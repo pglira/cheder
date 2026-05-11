@@ -13,6 +13,7 @@ class ImageView;
 class Action;
 class ActionPane;
 class ActionRegistry;
+class FileListModel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -46,9 +47,10 @@ private:
     ImageView *m_imageView;
     InfoPanel *m_infoPanel;
     ActionPane *m_actionPane;
-    QStringList m_files;
+    std::unique_ptr<FileListModel> m_fileModel;
     QString m_sourceDir;
     std::unique_ptr<ActionRegistry> m_actions;
-    bool m_translating = false;
+    bool m_dispatchingSyntheticKey = false;
     bool m_pendingG = false;
+    bool m_pendingD = false;
 };

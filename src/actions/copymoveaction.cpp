@@ -49,11 +49,8 @@ bool CopyMoveAction::configure(QWidget *parent, const QStringList &inputs, const
         });
 
     if (dlg.exec() != QDialog::Accepted) return false;
-
-    m_mode      = (group->checkedId() == 1 ? Mode::Move : Mode::Copy);
-    m_outDir    = shell.outDirEdit->text().trimmed();
-    m_overwrite = overwriteFromBox(shell.overwriteBox);
-    if (m_outDir.isEmpty()) return false;
+    if (!applyShellResults(shell, *this)) return false;
+    m_mode = (group->checkedId() == 1 ? Mode::Move : Mode::Copy);
     return true;
 }
 

@@ -1,5 +1,7 @@
 #include "thumbnailcache.h"
 
+#include "imageio.h"
+
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
@@ -20,11 +22,8 @@ const char *const kVersionKey = "Thumb::Cheder::Version";
 // aspect ratio and honoring EXIF orientation. Already-small sources are
 // returned untouched — never upscale a thumbnail.
 QImage composeCanonical(const QString &sourcePath) {
-    QImageReader reader(sourcePath);
-    reader.setAutoTransform(true);
-    const QImage img = reader.read();
+    const QImage img = readImage(sourcePath);
     if (img.isNull()) return QImage();
-
     if (img.width() <= kCanonicalMaxSize && img.height() <= kCanonicalMaxSize)
         return img;
     return img.scaled(QSize(kCanonicalMaxSize, kCanonicalMaxSize),

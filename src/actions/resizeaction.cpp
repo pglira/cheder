@@ -1,9 +1,9 @@
 #include "resizeaction.h"
 
+#include "../imageio.h"
 #include "actionwidgets.h"
 
 #include <QImage>
-#include <QImageReader>
 #include <QImageWriter>
 #include <QSpinBox>
 
@@ -44,20 +44,15 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
     finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
-
+    if (!applyShellResults(shell, *this)) return false;
     m_mode = static_cast<Mode>(modeBox->currentData().toInt());
     if (m_mode == Mode::ScalePercent) m_percent = valueSpin->value();
     else                              m_pixels  = valueSpin->value();
-    m_outDir    = shell.outDirEdit->text().trimmed();
-    m_overwrite = overwriteFromBox(shell.overwriteBox);
-    if (m_outDir.isEmpty()) return false;
     return true;
 }
 
 QString ResizeAction::applyOne(const QString &input, ActionLogger *logger) {
-    QImageReader reader(input);
-    reader.setAutoTransform(true);
-    QImage img = reader.read();
+    QImage img = readImage(input);
     if (img.isNull()) return {};
 
     QSize target;

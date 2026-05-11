@@ -46,6 +46,12 @@ public:
 
     QStringList apply(const QStringList &inputs, ActionLogger *logger) override;
 
+    // Used by configure() helpers to write the dialog results back. Subclasses
+    // can still set m_outDir / m_overwrite directly from within their own
+    // configure() if they need finer control.
+    void setOutDir(const QString &dir)     { m_outDir = dir; }
+    void setOverwrite(Overwrite o)         { m_overwrite = o; }
+
 protected:
     // Return the produced output path, or {} on failure/skip. Implementations
     // should route their actual write through writeOne() so the temp-file

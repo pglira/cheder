@@ -134,3 +134,15 @@ inline void finishActionDialog(ActionDialogShell &shell, QDialog *dlg,
 inline BatchAction::Overwrite overwriteFromBox(QComboBox *box) {
     return static_cast<BatchAction::Overwrite>(box->currentData().toInt());
 }
+
+// Copies the dialog's output dir + overwrite policy back onto `action`.
+// Returns false if the user accepted with an empty output directory (treated
+// the same as cancel by callers). Every action does these three lines after
+// dlg.exec() succeeds, so factor them out.
+inline bool applyShellResults(const ActionDialogShell &shell, BatchAction &action) {
+    const QString outDir = shell.outDirEdit->text().trimmed();
+    if (outDir.isEmpty()) return false;
+    action.setOutDir(outDir);
+    action.setOverwrite(overwriteFromBox(shell.overwriteBox));
+    return true;
+}

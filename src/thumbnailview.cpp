@@ -1,8 +1,8 @@
 #include "thumbnailview.h"
 
+#include "filelistmodel.h"
 #include "thumbnailcache.h"
 
-#include <QFileInfo>
 #include <QIcon>
 #include <QPainter>
 #include <QPixmap>
@@ -36,8 +36,8 @@ QPixmap placeholderPixmap(QSize size) {
 
 }  // namespace
 
-ThumbnailView::ThumbnailView(QWidget *parent)
-    : QListWidget(parent), m_cache(std::make_unique<ThumbnailCache>()) {
+ThumbnailView::ThumbnailView(FileListModel *model, QWidget *parent)
+    : QListWidget(parent), m_model(model), m_cache(std::make_unique<ThumbnailCache>()) {
     setViewMode(QListView::IconMode);
     setIconSize(QSize(kDefaultThumbSize, kDefaultThumbSize));
     setGridSize(gridSizeFor(kDefaultThumbSize));
@@ -48,6 +48,9 @@ ThumbnailView::ThumbnailView(QWidget *parent)
     setSpacing(4);
     setWordWrap(true);
     setTextElideMode(Qt::ElideMiddle);
+
+    connect(m_model, &FileListModel::filesChanged, this, &ThumbnailView::onFilesChanged);
+    onFilesChanged();
 }
 
 ThumbnailView::~ThumbnailView() = default;
@@ -79,8 +82,7 @@ void ThumbnailView::wheelEvent(QWheelEvent *event) {
     QListWidget::wheelEvent(event);
 }
 
-void ThumbnailView::setFiles(const QStringList &files) {
-    m_files = files;
+void ThumbnailView::onFilesChanged() {
     rebuildItems();
     startLoading();
 }
@@ -94,15 +96,32 @@ int ThumbnailView::firstSelectedRow() const {
     return min;
 }
 
+QString ThumbnailView::pathAt(int row) const {
+    if (auto *it = item(row)) return it->data(Qt::UserRole).toString();
+    return {};
+}
+
+QStringList ThumbnailView::selectedPaths() const {
+    QList<QListWidgetItem *> items = selectedItems();
+    std::sort(items.begin(), items.end(),
+              [this](auto *a, auto *b) { return row(a) < row(b); });
+    QStringList paths;
+    paths.reserve(items.size());
+    for (auto *it : items) paths << it->data(Qt::UserRole).toString();
+    return paths;
+}
+
 void ThumbnailView::rebuildItems() {
     QSet<QString> previouslySelected;
-    for (auto *it : selectedItems()) previouslySelected.insert(it->toolTip());
+    for (auto *it : selectedItems())
+        previouslySelected.insert(it->data(Qt::UserRole).toString());
     const int prevCurrentRow = currentRow();
 
     clear();
     const QPixmap placeholder = placeholderPixmap(iconSize());
-    for (const QString &path : m_files) {
+    for (const QString &path : m_model->files()) {
         auto *item = new QListWidgetItem(QIcon(placeholder), QString(), this);
+        item->setData(Qt::UserRole, path);
         item->setToolTip(path);
         item->setSizeHint(gridSize());
         if (previouslySelected.contains(path)) item->setSelected(true);
@@ -120,10 +139,11 @@ void ThumbnailView::startLoading() {
 
 void ThumbnailView::loadNext(qint64 generation) {
     if (generation != m_generation) return;
-    if (m_loadIndex >= m_files.size()) return;
+    const QStringList &files = m_model->files();
+    if (m_loadIndex >= files.size()) return;
 
     const int row = m_loadIndex++;
-    const QPixmap raw = m_cache->getThumbnail(m_files.at(row), iconSize());
+    const QPixmap raw = m_cache->getThumbnail(files.at(row), iconSize());
     if (generation == m_generation && !raw.isNull()) {
         // Pad to a square iconSize pixmap so every cell is the same size and
         // the icon area in QListView paints predictably.

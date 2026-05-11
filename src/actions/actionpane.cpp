@@ -15,6 +15,18 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+namespace {
+// Returns an empty string for non-Warn/Error levels, letting callers fall
+// back to a palette default rather than baking a color in here.
+QString colorForLevel(int level) {
+    switch (level) {
+    case ActionLogger::Error: return "#d33";
+    case ActionLogger::Warn:  return "#c80";
+    default:                  return {};
+    }
+}
+}  // namespace
+
 ActionPane::ActionPane(ActionRegistry *registry, QWidget *parent)
     : QWidget(parent),
       m_logger(new ActionLogger(this)),
@@ -71,13 +83,9 @@ void ActionPane::resizeEvent(QResizeEvent *event) {
 void ActionPane::appendLog(int level, const QString &message) {
     const QString ts = QTime::currentTime().toString("hh:mm:ss");
 
+    const QString color = colorForLevel(level);
+
     // History: HTML so colors per entry survive in scrollback.
-    QString color;
-    switch (level) {
-    case ActionLogger::Error: color = "#d33"; break;
-    case ActionLogger::Warn:  color = "#c80"; break;
-    default:                  color.clear();
-    }
     const QString safe = message.toHtmlEscaped();
     const QString html = color.isEmpty()
         ? QString("<span>%1&nbsp;&nbsp;%2</span>").arg(ts, safe)
@@ -88,13 +96,9 @@ void ActionPane::appendLog(int level, const QString &message) {
     m_lastFull  = ts + "  " + message;
     m_lastLevel = level;
     QPalette pal = m_logLatest->palette();
-    QColor c;
-    switch (level) {
-    case ActionLogger::Error: c = QColor("#d33"); break;
-    case ActionLogger::Warn:  c = QColor("#c80"); break;
-    default:                  c = m_logStrip->palette().color(QPalette::WindowText);
-    }
-    pal.setColor(QPalette::WindowText, c);
+    pal.setColor(QPalette::WindowText,
+                 color.isEmpty() ? m_logStrip->palette().color(QPalette::WindowText)
+                                 : QColor(color));
     m_logLatest->setPalette(pal);
 
     m_logStrip->setVisible(true);

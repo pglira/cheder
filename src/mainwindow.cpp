@@ -8,6 +8,7 @@
 #include "actions/copymoveaction.h"
 #include "actions/resizeaction.h"
 #include "actions/rotateaction.h"
+#include "filelistmodel.h"
 #include "imagedir.h"
 #include "imageview.h"
 #include "infopanel.h"
@@ -19,7 +20,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QKeyEvent>
-#include <QListWidgetItem>
 #include <QMessageBox>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -29,16 +29,16 @@
 #include <algorithm>
 
 MainWindow::MainWindow(const QStringList &files, QWidget *parent)
-    : QMainWindow(parent), m_files(files), m_actions(std::make_unique<ActionRegistry>()) {
+    : QMainWindow(parent),
+      m_fileModel(std::make_unique<FileListModel>()),
+      m_actions(std::make_unique<ActionRegistry>()) {
     if (!files.isEmpty()) m_sourceDir = QFileInfo(files.first()).absolutePath();
+    m_fileModel->setFiles(files);
 
     m_stack = new QStackedWidget(this);
 
-    m_thumbView = new ThumbnailView(this);
-    m_thumbView->setFiles(files);
-
-    m_imageView = new ImageView(this);
-    m_imageView->setFiles(files);
+    m_thumbView = new ThumbnailView(m_fileModel.get(), this);
+    m_imageView = new ImageView(m_fileModel.get(), this);
 
     m_infoPanel = new InfoPanel(this);
     m_infoPanel->hide();  // off by default; toggle with `i` while in image view
@@ -64,11 +64,11 @@ MainWindow::MainWindow(const QStringList &files, QWidget *parent)
     m_actionPane = new ActionPane(m_actions.get(), this);
 
     auto *centralContainer = new QWidget(this);
-    auto *vlay = new QVBoxLayout(centralContainer);
-    vlay->setContentsMargins(0, 0, 0, 0);
-    vlay->setSpacing(0);
-    vlay->addWidget(m_stack, 1);
-    vlay->addWidget(m_actionPane);
+    auto *centralLayout = new QVBoxLayout(centralContainer);
+    centralLayout->setContentsMargins(0, 0, 0, 0);
+    centralLayout->setSpacing(0);
+    centralLayout->addWidget(m_stack, 1);
+    centralLayout->addWidget(m_actionPane);
     setCentralWidget(centralContainer);
 
     connect(m_actionPane, &ActionPane::actionInvoked, this, &MainWindow::runAction);
@@ -100,10 +100,10 @@ void MainWindow::showThumbnails() {
     if (m_thumbView->count() > 0) {
         const int idx = m_imageView->index();
         if (idx >= 0 && idx < m_thumbView->count()) {
-            const auto cmd = m_thumbView->selectedItems().isEmpty()
+            const auto selectionCmd = m_thumbView->selectedItems().isEmpty()
                 ? QItemSelectionModel::ClearAndSelect
                 : QItemSelectionModel::NoUpdate;
-            m_thumbView->setCurrentRow(idx, cmd);
+            m_thumbView->setCurrentRow(idx, selectionCmd);
         }
     }
     m_thumbView->setFocus();
@@ -111,13 +111,13 @@ void MainWindow::showThumbnails() {
 }
 
 void MainWindow::showImage(int index) {
-    if (m_files.isEmpty()) return;
+    if (m_fileModel->isEmpty()) return;
     // Switch the stack first so the info panel is on-screen when setIndex()
     // emits currentChanged — otherwise the visibility-gated refresh sees a
     // hidden panel and the panel ends up with stale data from the previous
     // image.
     m_stack->setCurrentWidget(m_imageSplitter);
-    m_imageView->setIndex(std::clamp<int>(index, 0, static_cast<int>(m_files.size()) - 1));
+    m_imageView->setIndex(std::clamp(index, 0, m_fileModel->count() - 1));
     m_imageView->setFocus();
     updateTitle();
 }
@@ -133,11 +133,11 @@ void MainWindow::updateTitle() {
             setWindowTitle(QString("%1 (%2/%3) — cheder")
                                .arg(QFileInfo(p).fileName())
                                .arg(m_imageView->index() + 1)
-                               .arg(m_files.size()));
+                               .arg(m_fileModel->count()));
             return;
         }
     }
-    setWindowTitle(QString("cheder (%1 images)").arg(m_files.size()));
+    setWindowTitle(QString("cheder (%1 images)").arg(m_fileModel->count()));
 }
 
 QStringList MainWindow::currentInputs() const {
@@ -145,10 +145,10 @@ QStringList MainWindow::currentInputs() const {
         const QString p = m_imageView->currentPath();
         return p.isEmpty() ? QStringList{} : QStringList{p};
     }
-    QStringList paths;
-    for (auto *it : m_thumbView->selectedItems()) paths << it->toolTip();
+    QStringList paths = m_thumbView->selectedPaths();
     if (paths.isEmpty()) {
-        if (auto *it = m_thumbView->currentItem()) paths << it->toolTip();
+        const QString p = m_thumbView->pathAt(m_thumbView->currentRow());
+        if (!p.isEmpty()) paths << p;
     }
     return paths;
 }
@@ -251,24 +251,23 @@ void MainWindow::reload() {
 
     const QString currentImagePath = m_imageView->currentPath();
 
-    m_files = listImagesInDir(m_sourceDir);
-    // ThumbnailView::setFiles preserves selection by tooltip path; ImageView
-    // clamps the index, so we re-locate the previous image afterwards.
-    m_thumbView->setFiles(m_files);
-    m_imageView->setFiles(m_files);
+    // FileListModel emits filesChanged, which the views observe. ImageView
+    // clamps its index automatically; we re-locate the previously-shown
+    // image below if it survived.
+    m_fileModel->setFiles(listImagesInDir(m_sourceDir));
 
     if (!currentImagePath.isEmpty()) {
-        const int idx = m_files.indexOf(currentImagePath);
+        const int idx = m_fileModel->indexOf(currentImagePath);
         if (idx >= 0) m_imageView->setIndex(idx);
     }
 
-    statusBar()->showMessage(QString("Reloaded — %1 image(s)").arg(m_files.size()), 2500);
+    statusBar()->showMessage(QString("Reloaded — %1 image(s)").arg(m_fileModel->count()), 2500);
     updateTitle();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     Q_UNUSED(obj);
-    if (m_translating) return false;
+    if (m_dispatchingSyntheticKey) return false;
     if (event->type() != QEvent::KeyPress || !isActiveWindow()) return false;
 
     auto *ke = static_cast<QKeyEvent *>(event);
@@ -303,6 +302,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
 
     // "gg" sequence: lowercase g pressed twice -> Home
     if (origKey == Qt::Key_G && !(origMods & Qt::ShiftModifier)) {
+        m_pendingD = false;  // 'g' cancels a pending 'd'
         if (!m_pendingG) {
             m_pendingG = true;
             return true;
@@ -310,7 +310,24 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         m_pendingG = false;
         return dispatchTranslatedKey(Qt::Key_Home, origMods);
     }
-    m_pendingG = false;  // any other key cancels pending g
+
+    // "dd" sequence (vim-style): lowercase d pressed twice -> delete inputs.
+    if (origKey == Qt::Key_D
+        && !(origMods & (Qt::ShiftModifier | Qt::ControlModifier
+                         | Qt::AltModifier | Qt::MetaModifier))) {
+        m_pendingG = false;  // 'd' cancels a pending 'g'
+        if (!m_pendingD) {
+            m_pendingD = true;
+            return true;
+        }
+        m_pendingD = false;
+        deleteCurrentInputs();
+        return true;
+    }
+
+    // Any other key cancels both pending sequences.
+    m_pendingG = false;
+    m_pendingD = false;
 
     int key = origKey;
     auto mods = origMods;
@@ -338,10 +355,10 @@ bool MainWindow::dispatchTranslatedKey(int key, Qt::KeyboardModifiers mods) {
     // No explicit handler — re-dispatch as a synthetic event so the focused
     // widget sees the translated key (e.g. QListWidget's built-in nav).
     if (QWidget *target = QApplication::focusWidget()) {
-        m_translating = true;
+        m_dispatchingSyntheticKey = true;
         QKeyEvent translated(QEvent::KeyPress, key, mods);
         QApplication::sendEvent(target, &translated);
-        m_translating = false;
+        m_dispatchingSyntheticKey = false;
     }
     return true;
 }

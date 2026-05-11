@@ -1,5 +1,6 @@
 #include "captionaction.h"
 
+#include "../imageio.h"
 #include "actionwidgets.h"
 
 #include <QFont>
@@ -7,7 +8,6 @@
 #include <QFontMetrics>
 #include <QFrame>
 #include <QImage>
-#include <QImageReader>
 #include <QImageWriter>
 #include <QLabel>
 #include <QLineEdit>
@@ -87,11 +87,7 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     shell.form->addRow("Size",       sizeSpin);
 
     QImage srcOrig;
-    if (!inputs.isEmpty()) {
-        QImageReader reader(inputs.first());
-        reader.setAutoTransform(true);
-        srcOrig = reader.read();
-    }
+    if (!inputs.isEmpty()) srcOrig = readImage(inputs.first());
 
     auto *previewLabel = new PreviewLabel(&dlg);
     previewLabel->setAlignment(Qt::AlignCenter);
@@ -134,18 +130,14 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     finishActionDialog(shell, &dlg, defaultOutDir, m_overwrite);
 
     if (dlg.exec() != QDialog::Accepted) return false;
-
+    if (!applyShellResults(shell, *this)) return false;
     m_caption = captionEdit->text();
     if (m_caption.isEmpty()) return false;
-
     m_position   = static_cast<Position>(positionBox->currentData().toInt());
     m_bg         = static_cast<Bg>(bgBox->currentData().toInt());
     m_fg         = static_cast<Fg>(fgBox->currentData().toInt());
     m_fontFamily = fontBox->currentFont().family();
     m_pointSize  = sizeSpin->value();
-    m_outDir     = shell.outDirEdit->text().trimmed();
-    m_overwrite  = overwriteFromBox(shell.overwriteBox);
-    if (m_outDir.isEmpty()) return false;
     return true;
 }
 
@@ -197,9 +189,7 @@ QImage CaptionAction::renderCaptioned(const QImage &src,
 }
 
 QString CaptionAction::applyOne(const QString &input, ActionLogger *logger) {
-    QImageReader reader(input);
-    reader.setAutoTransform(true);
-    QImage src = reader.read();
+    const QImage src = readImage(input);
     if (src.isNull()) return {};
 
     const QImage out = renderCaptioned(src, m_caption, m_position, m_bg, m_fg,
