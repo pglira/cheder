@@ -39,6 +39,8 @@ add_executable(cheder
     src/actions/actionwidgets.h
     src/actions/writetarget.cpp
     src/actions/writetarget.h
+    src/actions/animationaction.cpp
+    src/actions/animationaction.h
     src/actions/captionaction.cpp
     src/actions/captionaction.h
     src/actions/concatenateaction.cpp

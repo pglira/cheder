@@ -311,12 +311,6 @@ private:
     QRect      m_dragStartRect;
 };
 
-QSize peekImageSize(const QString &path) {
-    QImageReader r(path);
-    r.setAutoTransform(true);
-    return r.size();
-}
-
 }  // namespace
 
 bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
