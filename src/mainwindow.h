@@ -40,7 +40,8 @@ private:
     QString defaultOutputDirFor(const Action *action) const;
     void runAction(Action *action);
     void deleteCurrentInputs();
-    void copySelectionToClipboard();
+    void copySelectionImagesToClipboard();
+    void copySelectionPathsToClipboard();
     void returnFocusToView();
 
     QStackedWidget *m_stack;

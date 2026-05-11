@@ -105,6 +105,8 @@ void MainWindow::wireKeyBindings() {
     // Global shortcuts that fire even while the action bar's input is focused.
     m_keys.bind({Qt::Key_F5,  {}, {}, Mode::Anywhere, /*fireWhileInputFocused=*/true,
                  [this] { reload(); }});
+    m_keys.bind({Qt::Key_F9,  {}, {}, Mode::Anywhere, /*fireWhileInputFocused=*/true,
+                 [this] { copySelectionPathsToClipboard(); }});
     m_keys.bind({Qt::Key_P, Qt::ControlModifier, {}, Mode::Anywhere, true,
                  [this] { m_actionPane->focusInput(); }});
 
@@ -115,7 +117,7 @@ void MainWindow::wireKeyBindings() {
                  Mode::Anywhere, false, [this] { close(); }});
 
     m_keys.bind({Qt::Key_C, Qt::ControlModifier, {}, Mode::Anywhere, false,
-                 [this] { copySelectionToClipboard(); }});
+                 [this] { copySelectionImagesToClipboard(); }});
 
     // Vim sequences: gg → Home (via synthetic dispatch to focused widget);
     // dd → delete current selection (with confirmation).
@@ -342,7 +344,31 @@ void MainWindow::deleteCurrentInputs() {
     reload();
 }
 
-void MainWindow::copySelectionToClipboard() {
+void MainWindow::copySelectionPathsToClipboard() {
+    // Mirrors copySelectionImagesToClipboard's strict selection model — F9 with
+    // nothing multi-selected gives "Nothing to copy" rather than grabbing
+    // the focused row.
+    //
+    // Payload is plain text (one absolute path per line) — no text/uri-list.
+    // Browsers prefer text/uri-list when both are present and then refuse
+    // the file:// URI for security, which breaks address-bar pasting. F9 is
+    // the "give me text I can paste anywhere" shortcut; Ctrl+C remains the
+    // rich-payload shortcut (pixels + uri-list) for image content.
+    const QStringList inputs = selectionPaths();
+    if (inputs.isEmpty()) {
+        statusBar()->showMessage("Nothing to copy", 3000);
+        return;
+    }
+
+    const QString message = inputs.size() == 1
+        ? QString("Copied %1 path to clipboard").arg(QFileInfo(inputs.first()).fileName())
+        : QString("Copied %1 paths to clipboard").arg(inputs.size());
+
+    QApplication::clipboard()->setText(inputs.join('\n'));
+    statusBar()->showMessage(message, 5000);
+}
+
+void MainWindow::copySelectionImagesToClipboard() {
     // Strict selection — unlike Delete and run-action (which use currentInputs()
     // and fall back to the focused row), Ctrl+C after deselecting reports
     // "Nothing to copy" rather than silently grabbing the focused thumbnail.
