@@ -41,6 +41,8 @@ add_executable(cheder
     src/actions/writetarget.h
     src/actions/animationaction.cpp
     src/actions/animationaction.h
+    src/actions/annotateaction.cpp
+    src/actions/annotateaction.h
     src/actions/captionaction.cpp
     src/actions/captionaction.h
     src/actions/concatenateaction.cpp
