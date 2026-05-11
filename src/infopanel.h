@@ -3,8 +3,9 @@
 #include <QString>
 #include <QWidget>
 
+class MetadataReader;
 class QFormLayout;
-class QProcess;
+class QJsonObject;
 class QShowEvent;
 
 // Side panel listing the selected image's metadata. Basics (filename,
@@ -32,10 +33,9 @@ private:
     void clearForm();
     void addRow(const QString &label, const QString &value);
     void populateBasics(const QString &path);
-    void requestExif(const QString &path);
-    void onExifFinished();
+    void onMetadataReady(const QString &path, const QJsonObject &meta);
 
-    QFormLayout *m_form;
-    QProcess *m_exifProc = nullptr;
-    QString m_currentPath;
+    QFormLayout    *m_form;
+    MetadataReader *m_reader;
+    QString         m_currentPath;
 };

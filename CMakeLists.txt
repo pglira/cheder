@@ -18,6 +18,8 @@ add_executable(cheder
     src/infopanel.h
     src/mainwindow.cpp
     src/mainwindow.h
+    src/metadatareader.cpp
+    src/metadatareader.h
     src/thumbnailcache.cpp
     src/thumbnailcache.h
     src/thumbnailview.cpp

@@ -1,15 +1,14 @@
 #include "infopanel.h"
 
+#include "metadatareader.h"
+
 #include <QDateTime>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QImageReader>
-#include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLocale>
-#include <QProcess>
 #include <QShowEvent>
 #include <QVBoxLayout>
 
@@ -32,7 +31,8 @@ QString jsonField(const QJsonObject &obj, const char *key) {
 
 }  // namespace
 
-InfoPanel::InfoPanel(QWidget *parent) : QWidget(parent) {
+InfoPanel::InfoPanel(QWidget *parent)
+    : QWidget(parent), m_reader(new MetadataReader(this)) {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(kPanelMargin, kPanelMargin, kPanelMargin, kPanelMargin);
     root->setSpacing(kPanelMargin);
@@ -44,6 +44,8 @@ InfoPanel::InfoPanel(QWidget *parent) : QWidget(parent) {
     root->addWidget(fields);
 
     root->addStretch();
+
+    connect(m_reader, &MetadataReader::metadataReady, this, &InfoPanel::onMetadataReady);
 }
 
 void InfoPanel::setCurrentPath(const QString &path) {
@@ -69,7 +71,7 @@ void InfoPanel::refresh() {
     }
 
     populateBasics(m_currentPath);
-    requestExif(m_currentPath);
+    m_reader->request(m_currentPath);
 }
 
 void InfoPanel::clearForm() {
@@ -105,29 +107,8 @@ void InfoPanel::populateBasics(const QString &path) {
     addRow("Modified", fi.lastModified().toString("yyyy-MM-dd hh:mm:ss"));
 }
 
-void InfoPanel::requestExif(const QString &path) {
-    if (!m_exifProc) {
-        m_exifProc = new QProcess(this);
-        connect(m_exifProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-                this, [this](int, QProcess::ExitStatus) { onExifFinished(); });
-    } else if (m_exifProc->state() != QProcess::NotRunning) {
-        m_exifProc->kill();
-        m_exifProc->waitForFinished(50);
-    }
-    m_exifProc->setProperty("path", path);
-    m_exifProc->start("exiftool", {"-j", "-n", "--", path});
-}
-
-void InfoPanel::onExifFinished() {
-    const QString path = m_exifProc->property("path").toString();
-    if (path != m_currentPath) return;  // stale
-    if (m_exifProc->exitStatus() != QProcess::NormalExit || m_exifProc->exitCode() != 0) return;
-
-    const QByteArray out = m_exifProc->readAllStandardOutput();
-    QJsonParseError err;
-    const QJsonDocument doc = QJsonDocument::fromJson(out, &err);
-    if (err.error != QJsonParseError::NoError || !doc.isArray() || doc.array().isEmpty()) return;
-    const QJsonObject obj = doc.array().first().toObject();
+void InfoPanel::onMetadataReady(const QString &path, const QJsonObject &obj) {
+    if (path != m_currentPath) return;  // stale — selection moved on
 
     auto pushIf = [this, &obj](const QString &label, const char *key) {
         addRow(label, jsonField(obj, key));
