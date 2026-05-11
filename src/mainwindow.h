@@ -42,6 +42,7 @@ private:
     void deleteCurrentInputs();
     void copySelectionImagesToClipboard();
     void copySelectionPathsToClipboard();
+    void sendSelectionToDungeon();
     void returnFocusToView();
 
     QStackedWidget *m_stack;

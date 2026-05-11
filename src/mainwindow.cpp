@@ -31,6 +31,7 @@
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QProcess>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -126,6 +127,16 @@ void MainWindow::wireKeyBindings() {
 
     m_keys.bind({Qt::Key_C, Qt::ControlModifier, {}, Mode::Anywhere, false,
                  [this] { copySelectionImagesToClipboard(); }});
+
+    // Plain 'm' (no modifier) sends the current selection to dungeon. The
+    // forbidden-modifier set excludes capital M (Shift) and combos like
+    // Alt+M (reserved for the Copy or Move action) so this binding only
+    // fires for unmodified, lowercase 'm'. fireWhileInputFocused=false
+    // lets the action-bar filter still receive 'm' as a typed letter.
+    m_keys.bind({Qt::Key_M, {},
+                 Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier,
+                 Mode::Anywhere, false,
+                 [this] { sendSelectionToDungeon(); }});
 
     // Vim sequences: gg → Home (via synthetic dispatch to focused widget);
     // dd → delete current selection (with confirmation).
@@ -374,6 +385,28 @@ void MainWindow::copySelectionPathsToClipboard() {
 
     QApplication::clipboard()->setText(inputs.join('\n'));
     statusBar()->showMessage(message, 5000);
+}
+
+void MainWindow::sendSelectionToDungeon() {
+    // Hand the current selection to the external `dungeon` helper as command-
+    // line arguments. Strict-selection semantics like F9: no fallback to the
+    // focused row, so the user always sees what they're sending. startDetached
+    // returns immediately and lets dungeon outlive the cheder process.
+    const QStringList inputs = selectionPaths();
+    if (inputs.isEmpty()) {
+        statusBar()->showMessage("Nothing to send to dungeon", 3000);
+        return;
+    }
+
+    if (!QProcess::startDetached("dungeon", inputs)) {
+        statusBar()->showMessage("Failed to start dungeon (is it on PATH?)", 5000);
+        return;
+    }
+
+    const QString message = inputs.size() == 1
+        ? QString("Sent %1 to dungeon").arg(QFileInfo(inputs.first()).fileName())
+        : QString("Sent %1 files to dungeon").arg(inputs.size());
+    statusBar()->showMessage(message, 3000);
 }
 
 void MainWindow::copySelectionImagesToClipboard() {

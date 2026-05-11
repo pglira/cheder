@@ -47,6 +47,7 @@ Optional external tools:
 - `Ctrl+P` — focus the action bar (type to filter, `Enter` runs, `Esc`/`Tab` dismiss)
 - `Ctrl+C` — copy the current selection to the clipboard (file URL + pixels for a single image; URLs only for many)
 - `F9` — copy the current selection's filepath(s) to the clipboard as plain text (one per line — paste-anywhere; for file-reference clipboard use `Ctrl+C`)
+- `m` — send the current selection's filepath(s) to [`dungeon`](https://github.com/pglira/dungeon) (external helper, must be on `PATH`)
 - `Delete` / `d d` — move the current selection to trash (with confirmation)
 - `F5` — re-scan the source directory
 - `q` — quit
