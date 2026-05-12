@@ -9,7 +9,7 @@ public:
     QString description() const override { return "Scale by longest edge or percent"; }
     QKeySequence shortcut() const override { return QKeySequence("Alt+S"); }
 
-    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
+    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) override;
 
 protected:
     QString applyOne(const QString &input, ActionLogger *logger) override;

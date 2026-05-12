@@ -318,7 +318,7 @@ private:
 
 }  // namespace
 
-bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     // Same-size validation. Refuses the entire selection on any mismatch —
     // the dialog never opens, so the user can see at a glance what went wrong
     // and re-select.

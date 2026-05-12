@@ -7,7 +7,7 @@
 #include <QMessageBox>
 #include <QTimer>
 
-bool RenameAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool RenameAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     if (inputs.size() != 1) return false;  // belt-and-braces; acceptsCount already enforces
 
     QDialog dlg(parent);

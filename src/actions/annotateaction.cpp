@@ -917,7 +917,7 @@ private:
 
 }  // namespace
 
-bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     if (inputs.size() != 1) return false;
 
     const QString sourcePath = inputs.first();
@@ -1158,17 +1158,21 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
     QObject::connect(undoSc, &QShortcut::activated, &dlg,
                      [canvas, commitPre] { commitPre(); canvas->undo(); });
 
-    const auto r = b.exec();
-    if (!r.accepted) return false;
+    b.setApplyMode([this, inputs, logger, canvas, filenameEdit, commitPre]
+                   (const ActionDialogBuilder::Outcome &o) {
+        const QString filename = filenameEdit->text().trimmed();
+        if (filename.isEmpty()) return;
+        // Flush any in-flight style snapshot so the Apply re-renders the
+        // currently-displayed canvas state, not a stale one.
+        commitPre();
+        m_shapes      = canvas->shapes();
+        m_outDir      = o.outDir;
+        m_outFilename = filename;
+        m_overwrite   = o.overwrite;
+        apply(inputs, logger);
+    });
 
-    const QString filename = filenameEdit->text().trimmed();
-    if (filename.isEmpty()) return false;
-
-    m_shapes      = canvas->shapes();
-    m_outDir      = r.outDir;
-    m_outFilename = filename;
-    m_overwrite   = r.overwrite;
-    return true;
+    return b.exec().accepted;
 }
 
 QStringList AnnotateAction::apply(const QStringList &inputs, ActionLogger *logger) {

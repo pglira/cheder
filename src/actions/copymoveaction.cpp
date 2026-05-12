@@ -9,7 +9,7 @@
 #include <QFileInfo>
 #include <QRadioButton>
 
-bool CopyMoveAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool CopyMoveAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Copy or move");
 

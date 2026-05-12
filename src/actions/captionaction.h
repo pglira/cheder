@@ -15,8 +15,9 @@ public:
     // single caption, font, and size; running it across a multi-selection
     // would slap the same text on every file.
     bool acceptsCount(int n) const override { return n == 1; }
+    bool supportsMultiApply() const override { return true; }
 
-    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
+    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) override;
 
 protected:
     QString applyOne(const QString &input, ActionLogger *logger) override;

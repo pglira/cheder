@@ -14,7 +14,7 @@ public:
     // what the user wants.
     bool acceptsCount(int n) const override { return n == 1; }
 
-    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
+    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) override;
 
 protected:
     QString applyOne(const QString &input, ActionLogger *logger) override;

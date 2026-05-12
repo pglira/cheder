@@ -138,7 +138,7 @@ QImage GridAction::renderGrid(const QList<QImage> &srcs,
     return out;
 }
 
-bool GridAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool GridAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Grid");
 
@@ -479,34 +479,39 @@ bool GridAction::configure(QWidget *parent, const QStringList &inputs, const QSt
 
     refreshPreview();
 
-    const auto r = b.exec();
-    if (!r.accepted) return false;
+    b.setApplyMode([this, inputs, logger,
+                    colsSpin, cellWSpin, cellHSpin, hSpacingSpin, vSpacingSpin,
+                    bgState, titleState, fontBox, fontSizeSpin,
+                    currentTitleSource, orderedFromTable, table, filenameEdit]
+                   (const ActionDialogBuilder::Outcome &o) {
+        Q_UNUSED(inputs);
+        const QString filename = filenameEdit->text().trimmed();
+        if (filename.isEmpty()) return;
+        m_cols          = colsSpin->value();
+        m_cellW         = cellWSpin->value();
+        m_cellH         = cellHSpin->value();
+        m_hSpacing      = hSpacingSpin->value();
+        m_vSpacing      = vSpacingSpin->value();
+        m_bgColor       = *bgState;
+        m_titleColor    = *titleState;
+        m_fontFamily    = fontBox->currentFont().family();
+        m_fontPointSize = fontSizeSpin->value();
+        m_titleSource   = currentTitleSource();
+        m_orderedInputs = orderedFromTable();
+        // Merge each row's title into the persistent map; older paths retain
+        // their saved titles so re-opening Grid on a previous input set works.
+        for (int i = 0; i < table->rowCount(); ++i) {
+            const QString path  = table->item(i, 0)->data(Qt::UserRole).toString();
+            const QString title = table->item(i, 1) ? table->item(i, 1)->text() : QString();
+            m_titles.insert(path, title);
+        }
+        m_outDir      = o.outDir;
+        m_outFilename = filename;
+        m_overwrite   = o.overwrite;
+        apply(m_orderedInputs, logger);
+    });
 
-    const QString filename = filenameEdit->text().trimmed();
-    if (filename.isEmpty()) return false;
-
-    m_cols          = colsSpin->value();
-    m_cellW         = cellWSpin->value();
-    m_cellH         = cellHSpin->value();
-    m_hSpacing      = hSpacingSpin->value();
-    m_vSpacing      = vSpacingSpin->value();
-    m_bgColor       = *bgState;
-    m_titleColor    = *titleState;
-    m_fontFamily    = fontBox->currentFont().family();
-    m_fontPointSize = fontSizeSpin->value();
-    m_titleSource   = currentTitleSource();
-    m_orderedInputs = orderedFromTable();
-    // Merge each row's title into the persistent map; older paths retain
-    // their saved titles so re-opening Grid on a previous input set works.
-    for (int i = 0; i < table->rowCount(); ++i) {
-        const QString path  = table->item(i, 0)->data(Qt::UserRole).toString();
-        const QString title = table->item(i, 1) ? table->item(i, 1)->text() : QString();
-        m_titles.insert(path, title);
-    }
-    m_outDir        = r.outDir;
-    m_outFilename   = filename;
-    m_overwrite     = r.overwrite;
-    return true;
+    return b.exec().accepted;
 }
 
 QStringList GridAction::apply(const QStringList &inputs, ActionLogger *logger) {

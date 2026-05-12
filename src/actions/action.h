@@ -33,12 +33,24 @@ public:
 
     virtual bool acceptsCount(int n) const = 0;
 
+    // When true, the dialog shows an Apply / Close button pair instead of
+    // OK / Cancel: Apply runs the action and keeps the dialog open so the
+    // user can iterate on parameters without re-entering the action.
+    // Multi-apply configure() implementations call apply() themselves from
+    // their Apply handler; MainWindow then skips its own post-configure
+    // apply() call. Default false preserves the original single-shot flow.
+    virtual bool supportsMultiApply() const { return false; }
+
     // Show the parameter dialog. Returns false on cancel. `inputs` lets the
     // dialog summarise what it will operate on; `defaultOutDir` is the
     // suggested output (first input's parent dir + this action's id()).
+    // `logger` is forwarded so multi-apply implementations can invoke
+    // apply() from inside the dialog's Apply button; single-shot actions
+    // ignore it and let MainWindow drive apply() after configure() returns.
     virtual bool configure(QWidget *parent,
                            const QStringList &inputs,
-                           const QString &defaultOutDir) = 0;
+                           const QString &defaultOutDir,
+                           ActionLogger *logger) = 0;
 
     // Run on `inputs`; return the paths actually written. `logger` may be
     // null; subclasses should use it to report per-file outcomes.

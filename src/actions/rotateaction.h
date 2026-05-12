@@ -9,7 +9,7 @@ public:
     QString description() const override { return "Rotate by a fixed angle"; }
     QKeySequence shortcut() const override { return QKeySequence("Alt+R"); }
 
-    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
+    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) override;
 
 protected:
     QString applyOne(const QString &input, ActionLogger *logger) override;

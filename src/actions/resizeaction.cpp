@@ -7,7 +7,7 @@
 #include <QImageWriter>
 #include <QSpinBox>
 
-bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Resize");
 

@@ -93,7 +93,7 @@ QImage ConcatenateAction::renderConcat(const QList<QImage> &srcs,
     return out;
 }
 
-bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Concatenate");
 
@@ -271,21 +271,24 @@ bool ConcatenateAction::configure(QWidget *parent, const QStringList &inputs, co
 
     refreshPreview();
 
-    const auto r = b.exec();
-    if (!r.accepted) return false;
+    b.setApplyMode([this, inputs, logger,
+                    orientBox, targetSpin, spacingSpin, bgBox, inputsList, filenameEdit]
+                   (const ActionDialogBuilder::Outcome &o) {
+        Q_UNUSED(inputs);  // ordering captured from inputsList below
+        const QString filename = filenameEdit->text().trimmed();
+        if (filename.isEmpty()) return;
+        m_orientation   = static_cast<Orientation>(orientBox->currentData().toInt());
+        m_targetAxis    = targetSpin->value();
+        m_spacing       = spacingSpin->value();
+        m_bg            = static_cast<Bg>(bgBox->currentData().toInt());
+        m_orderedInputs = orderedPathsFrom(inputsList);
+        m_outDir        = o.outDir;
+        m_outFilename   = filename;
+        m_overwrite     = o.overwrite;
+        apply(m_orderedInputs, logger);
+    });
 
-    const QString filename = filenameEdit->text().trimmed();
-    if (filename.isEmpty()) return false;
-
-    m_orientation   = static_cast<Orientation>(orientBox->currentData().toInt());
-    m_targetAxis    = targetSpin->value();
-    m_spacing       = spacingSpin->value();
-    m_bg            = static_cast<Bg>(bgBox->currentData().toInt());
-    m_orderedInputs = orderedPathsFrom(inputsList);
-    m_outDir        = r.outDir;
-    m_outFilename   = filename;
-    m_overwrite     = r.overwrite;
-    return true;
+    return b.exec().accepted;
 }
 
 QStringList ConcatenateAction::apply(const QStringList &inputs, ActionLogger *logger) {

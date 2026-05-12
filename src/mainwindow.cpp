@@ -297,22 +297,33 @@ void MainWindow::runAction(Action *action) {
         return;
     }
 
-    if (!action->configure(this, inputs, defaultOutputDirFor(action))) {
+    ActionLogger *logger = m_actionPane->logger();
+    const bool configured = action->configure(this, inputs, defaultOutputDirFor(action), logger);
+
+    if (!configured) {
         m_actionPane->resetState();
         returnFocusToView();
         return;
     }
 
-    const QStringList outputs = action->apply(inputs, m_actionPane->logger());
-    if (outputs.isEmpty()) {
-        statusBar()->showMessage("Action produced no output", 5000);
-    } else {
-        const QString outDir = QFileInfo(outputs.first()).absolutePath();
-        statusBar()->showMessage(
-            QString("Wrote %1 file(s) to %2").arg(outputs.size()).arg(outDir), 7000);
-        // Move could have taken files away; in-place edits touch mtimes —
-        // re-scan so the views match disk.
+    if (action->supportsMultiApply()) {
+        // Multi-apply actions invoke apply() themselves from inside the
+        // dialog's Apply button; configure() returning true here just means
+        // "at least one Apply succeeded". Reload so the views catch the
+        // file(s) the action wrote during the session.
         reload();
+    } else {
+        const QStringList outputs = action->apply(inputs, logger);
+        if (outputs.isEmpty()) {
+            statusBar()->showMessage("Action produced no output", 5000);
+        } else {
+            const QString outDir = QFileInfo(outputs.first()).absolutePath();
+            statusBar()->showMessage(
+                QString("Wrote %1 file(s) to %2").arg(outputs.size()).arg(outDir), 7000);
+            // Move could have taken files away; in-place edits touch mtimes —
+            // re-scan so the views match disk.
+            reload();
+        }
     }
     m_actionPane->resetState();
     returnFocusToView();

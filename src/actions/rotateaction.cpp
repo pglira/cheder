@@ -9,7 +9,7 @@
 #include <QRadioButton>
 #include <QTransform>
 
-bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Rotate");
 

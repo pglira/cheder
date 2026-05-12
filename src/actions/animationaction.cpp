@@ -100,7 +100,7 @@ bool writeConcatList(const QString &listPath, const QStringList &inputs, double 
 
 }  // namespace
 
-bool AnimationAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool AnimationAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     if (inputs.size() < 2) return false;
 
     // Same-size validation — refuse the entire selection on any mismatch so
@@ -252,20 +252,22 @@ bool AnimationAction::configure(QWidget *parent, const QStringList &inputs, cons
     b.setPreview(previewContainer);
     b.addOutputControls(defaultOutDir, m_overwrite);
 
-    const auto r = b.exec();
-    if (!r.accepted) return false;
+    b.setApplyMode([this, inputs, logger,
+                    formatBox, fpsSpin, loopsSpin, qualityBox, filenameEdit]
+                   (const ActionDialogBuilder::Outcome &o) {
+        const QString filename = filenameEdit->text().trimmed();
+        if (filename.isEmpty()) return;
+        m_format      = static_cast<Format>(formatBox->currentData().toInt());
+        m_fps         = fpsSpin->value();
+        m_loops       = loopsSpin->value();
+        m_quality     = static_cast<Quality>(qualityBox->currentData().toInt());
+        m_outDir      = o.outDir;
+        m_outFilename = filename;
+        m_overwrite   = o.overwrite;
+        apply(inputs, logger);
+    });
 
-    const QString filename = filenameEdit->text().trimmed();
-    if (filename.isEmpty()) return false;
-
-    m_format      = static_cast<Format>(formatBox->currentData().toInt());
-    m_fps         = fpsSpin->value();
-    m_loops       = loopsSpin->value();
-    m_quality     = static_cast<Quality>(qualityBox->currentData().toInt());
-    m_outDir      = r.outDir;
-    m_outFilename = filename;
-    m_overwrite   = r.overwrite;
-    return true;
+    return b.exec().accepted;
 }
 
 QStringList AnimationAction::apply(const QStringList &inputs, ActionLogger *logger) {

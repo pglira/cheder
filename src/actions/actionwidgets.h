@@ -155,12 +155,6 @@ public:
             }
         }
         m_form->addRow("If output exists", m_overwriteBox);
-
-        // Stash the button box for exec() to append below the form/splitter.
-        m_buttons = new QDialogButtonBox(
-            QDialogButtonBox::Ok | QDialogButtonBox::Cancel, m_dialog);
-        QObject::connect(m_buttons, &QDialogButtonBox::accepted, m_dialog, &QDialog::accept);
-        QObject::connect(m_buttons, &QDialogButtonBox::rejected, m_dialog, &QDialog::reject);
     }
 
     // Returns nullptr before addOutputControls. Used by actions that need
@@ -185,7 +179,35 @@ public:
         WriteTarget::Overwrite overwrite = WriteTarget::Overwrite::Overwrite;
     };
 
-    // Runs the dialog. accepted=false on user-cancel or empty output dir.
+    // Switches the dialog's button strip from OK/Cancel to Apply/Close.
+    // Apply invokes `onApply` with the current Outcome and leaves the
+    // dialog open, so the user can tweak parameters and Apply again. Close
+    // dismisses without firing another apply. exec()'s return value's
+    // `accepted` is true if at least one Apply happened during the session.
+    // Used by actions that opt in via supportsMultiApply().
+    void setApplyMode(std::function<void(const Outcome &)> onApply) {
+        m_applyCallback = std::move(onApply);
+    }
+
+    // Snapshot of the current dialog state as an Outcome. Returns
+    // accepted=false when the output dir is empty (matches the OK/Cancel
+    // exec()'s validation) so the Apply handler can quietly skip empty
+    // submissions.
+    Outcome currentOutcome() const {
+        Outcome r;
+        if (!m_outDirEdit || !m_overwriteBox) return r;
+        const QString outDir = m_outDirEdit->text().trimmed();
+        if (outDir.isEmpty()) return r;
+        r.accepted  = true;
+        r.outDir    = outDir;
+        r.overwrite = static_cast<WriteTarget::Overwrite>(
+            m_overwriteBox->currentData().toInt());
+        return r;
+    }
+
+    // Runs the dialog. In OK/Cancel mode, accepted=false on user-cancel or
+    // empty output dir. In Apply/Close mode, accepted=true if at least one
+    // Apply was clicked successfully during the session.
     Outcome exec() {
         // Assemble the body now that we know if setPreview() was called.
         // Single-column path drops the form straight under the header; two-
@@ -229,18 +251,45 @@ public:
         } else {
             m_root->addLayout(m_form);
         }
-        if (m_buttons) m_root->addWidget(m_buttons);
 
-        Outcome r;
-        if (m_dialog->exec() != QDialog::Accepted) return r;
-        if (!m_outDirEdit || !m_overwriteBox)      return r;
-        const QString outDir = m_outDirEdit->text().trimmed();
-        if (outDir.isEmpty()) return r;
-        r.accepted  = true;
-        r.outDir    = outDir;
-        r.overwrite = static_cast<WriteTarget::Overwrite>(
-            m_overwriteBox->currentData().toInt());
-        return r;
+        // Button strip — defer here so we know whether Apply-mode was
+        // requested by the caller (via setApplyMode). OK/Cancel stays the
+        // default; Apply/Close keeps the dialog open and tracks whether
+        // anything was committed.
+        auto applied = std::make_shared<bool>(false);
+        auto *buttons = new QDialogButtonBox(m_dialog);
+        if (m_applyCallback) {
+            auto *applyBtn = buttons->addButton(QStringLiteral("Apply"),
+                                                QDialogButtonBox::ApplyRole);
+            auto *closeBtn = buttons->addButton(QStringLiteral("Close"),
+                                                QDialogButtonBox::RejectRole);
+            QObject::connect(applyBtn, &QPushButton::clicked, m_dialog,
+                [this, applied] {
+                    const Outcome o = currentOutcome();
+                    if (!o.accepted) return;  // empty out dir — silently skip
+                    m_applyCallback(o);
+                    *applied = true;
+                });
+            QObject::connect(closeBtn, &QPushButton::clicked, m_dialog,
+                             &QDialog::reject);
+        } else {
+            buttons->addButton(QDialogButtonBox::Ok);
+            buttons->addButton(QDialogButtonBox::Cancel);
+            QObject::connect(buttons, &QDialogButtonBox::accepted, m_dialog, &QDialog::accept);
+            QObject::connect(buttons, &QDialogButtonBox::rejected, m_dialog, &QDialog::reject);
+        }
+        m_root->addWidget(buttons);
+
+        const int code = m_dialog->exec();
+        if (m_applyCallback) {
+            // Multi-apply: accepted iff the user applied at least once.
+            // outDir/overwrite from the current widget state — caller
+            // already saw each Apply's state via the callback.
+            if (!*applied) return Outcome{};
+            return currentOutcome();
+        }
+        if (code != QDialog::Accepted) return Outcome{};
+        return currentOutcome();
     }
 
 private:
@@ -249,7 +298,7 @@ private:
     QFormLayout          *m_form          = nullptr;
     QWidget              *m_previewWidget = nullptr;
     std::function<void()> m_previewOnResize;
-    QDialogButtonBox     *m_buttons       = nullptr;
     QLineEdit            *m_outDirEdit    = nullptr;
     QComboBox            *m_overwriteBox  = nullptr;
+    std::function<void(const Outcome &)> m_applyCallback;
 };

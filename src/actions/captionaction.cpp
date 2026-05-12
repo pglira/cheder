@@ -46,7 +46,7 @@ private:
 
 }  // namespace
 
-bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) {
+bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) {
     QDialog dlg(parent);
     dlg.setWindowTitle("Caption");
 
@@ -129,19 +129,27 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
 
     b.addOutputControls(defaultOutDir, m_overwrite);
 
-    const auto r = b.exec();
-    if (!r.accepted) return false;
-    const QString caption = captionEdit->text();
-    if (caption.isEmpty()) return false;
-    m_caption    = caption;
-    m_position   = static_cast<Position>(positionBox->currentData().toInt());
-    m_bg         = static_cast<Bg>(bgBox->currentData().toInt());
-    m_fg         = static_cast<Fg>(fgBox->currentData().toInt());
-    m_fontFamily = fontBox->currentFont().family();
-    m_pointSize  = sizeSpin->value();
-    m_outDir     = r.outDir;
-    m_overwrite  = r.overwrite;
-    return true;
+    // Apply/Close mode: Apply commits the current widget state into the
+    // action's members and runs apply() against the original inputs. Each
+    // click is one full action invocation; the user can keep tweaking and
+    // re-applying until Close.
+    b.setApplyMode([this, inputs, logger,
+                    captionEdit, positionBox, bgBox, fgBox, fontBox, sizeSpin]
+                   (const ActionDialogBuilder::Outcome &o) {
+        const QString caption = captionEdit->text();
+        if (caption.isEmpty()) return;
+        m_caption    = caption;
+        m_position   = static_cast<Position>(positionBox->currentData().toInt());
+        m_bg         = static_cast<Bg>(bgBox->currentData().toInt());
+        m_fg         = static_cast<Fg>(fgBox->currentData().toInt());
+        m_fontFamily = fontBox->currentFont().family();
+        m_pointSize  = sizeSpin->value();
+        m_outDir     = o.outDir;
+        m_overwrite  = o.overwrite;
+        apply(inputs, logger);
+    });
+
+    return b.exec().accepted;
 }
 
 QImage CaptionAction::renderCaptioned(const QImage &src,

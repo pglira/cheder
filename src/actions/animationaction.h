@@ -14,8 +14,9 @@ public:
     QKeySequence shortcut() const override { return QKeySequence("Alt+A"); }
 
     bool acceptsCount(int n) const override { return n >= 2; }
+    bool supportsMultiApply() const override { return true; }
 
-    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir) override;
+    bool configure(QWidget *parent, const QStringList &inputs, const QString &defaultOutDir, ActionLogger *logger) override;
     QStringList apply(const QStringList &inputs, ActionLogger *logger) override;
 
     enum class Format  { Gif, Mp4 };
