@@ -40,6 +40,7 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
 
     b.addRow("Mode",  modeBox);
     b.addRow("Value", valueSpin);
+    b.addOutputFilenameField(QStringLiteral("{stem}_resized.{ext}"));
     b.addOutputControls(defaultOutDir, m_overwrite);
 
     const auto r = b.exec();
@@ -47,8 +48,9 @@ bool ResizeAction::configure(QWidget *parent, const QStringList &inputs, const Q
     m_mode = static_cast<Mode>(modeBox->currentData().toInt());
     if (m_mode == Mode::ScalePercent) m_percent = valueSpin->value();
     else                              m_pixels  = valueSpin->value();
-    m_outDir    = r.outDir;
-    m_overwrite = r.overwrite;
+    m_outDir              = r.outDir;
+    m_overwrite           = r.overwrite;
+    m_outFilenameTemplate = r.outFilename;
     return true;
 }
 

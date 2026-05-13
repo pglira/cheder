@@ -178,7 +178,47 @@ public:
         bool                   accepted = false;
         QString                outDir;
         WriteTarget::Overwrite overwrite = WriteTarget::Overwrite::Overwrite;
+        // Empty when the dialog didn't add a filename field. Otherwise the
+        // user's template — `{stem}` and `{ext}` placeholders rendered per
+        // input at apply() time via WriteTarget::renderFilename.
+        QString                outFilename;
     };
+
+    // Adds a single "Output file" row containing a QLineEdit pre-filled with
+    // `defaultTemplate` and an inline error label that surfaces underneath
+    // when the user submits an empty template. The template uses `{stem}` /
+    // `{ext}` placeholders (see WriteTarget::renderFilename). Tooltip on the
+    // field explains the syntax; the row is appended to the form layout, so
+    // call before addOutputControls() to keep the output group together.
+    void addOutputFilenameField(const QString &defaultTemplate) {
+        m_outFilenameEdit = new QLineEdit(defaultTemplate, m_dialog);
+        m_outFilenameEdit->setToolTip(
+            QStringLiteral("Use {stem} for the input's basename and "
+                           "{ext} for its extension (no dot)."));
+
+        m_outFilenameErrorLabel = new QLabel(
+            QStringLiteral("Output filename is required."), m_dialog);
+        m_outFilenameErrorLabel->setStyleSheet("color: #cc0000;");
+        m_outFilenameErrorLabel->setVisible(false);
+
+        auto *wrapper = new QWidget(m_dialog);
+        auto *vbox = new QVBoxLayout(wrapper);
+        vbox->setContentsMargins(0, 0, 0, 0);
+        vbox->setSpacing(2);
+        vbox->addWidget(m_outFilenameEdit);
+        vbox->addWidget(m_outFilenameErrorLabel);
+
+        // Clear the error state the moment the user starts fixing it — no
+        // need to wait for the next submit attempt to confirm the field is
+        // populated again.
+        QObject::connect(m_outFilenameEdit, &QLineEdit::textChanged, m_dialog,
+            [this](const QString &) {
+                if (m_outFilenameErrorLabel)
+                    m_outFilenameErrorLabel->setVisible(false);
+            });
+
+        m_form->addRow(QStringLiteral("Output file"), wrapper);
+    }
 
     // Switches the dialog's button strip from OK/Cancel to Apply/Close.
     // Apply invokes `onApply` with the current Outcome and leaves the
@@ -197,18 +237,25 @@ public:
     }
 
     // Snapshot of the current dialog state as an Outcome. Returns
-    // accepted=false when the output dir is empty (matches the OK/Cancel
-    // exec()'s validation) so the Apply handler can quietly skip empty
-    // submissions.
+    // accepted=false when the output dir is empty or (when an output-filename
+    // field was added) when its template is empty — matches the OK/Cancel
+    // exec()'s validation so the Apply handler can quietly skip invalid
+    // submissions and so OK/Cancel can refuse to accept.
     Outcome currentOutcome() const {
         Outcome r;
         if (!m_outDirEdit || !m_overwriteBox) return r;
         const QString outDir = m_outDirEdit->text().trimmed();
         if (outDir.isEmpty()) return r;
-        r.accepted  = true;
-        r.outDir    = outDir;
-        r.overwrite = static_cast<WriteTarget::Overwrite>(
+        QString outFilename;
+        if (m_outFilenameEdit) {
+            outFilename = m_outFilenameEdit->text().trimmed();
+            if (outFilename.isEmpty()) return r;
+        }
+        r.accepted    = true;
+        r.outDir      = outDir;
+        r.overwrite   = static_cast<WriteTarget::Overwrite>(
             m_overwriteBox->currentData().toInt());
+        r.outFilename = outFilename;
         return r;
     }
 
@@ -273,6 +320,7 @@ public:
                                                 QDialogButtonBox::RejectRole);
             QObject::connect(applyBtn, &QPushButton::clicked, m_dialog,
                 [this, applied] {
+                    if (!validateAndShowErrors()) return;
                     const Outcome o = currentOutcome();
                     if (!o.accepted) return;  // empty out dir — silently skip
                     m_applyCallback(o);
@@ -305,7 +353,15 @@ public:
         } else {
             buttons->addButton(QDialogButtonBox::Ok);
             buttons->addButton(QDialogButtonBox::Cancel);
-            QObject::connect(buttons, &QDialogButtonBox::accepted, m_dialog, &QDialog::accept);
+            // Validate before accepting so the inline error label can surface
+            // an empty filename without closing the dialog. accepted() fires
+            // whether the user pressed Enter or clicked OK, so this catches
+            // both paths.
+            QObject::connect(buttons, &QDialogButtonBox::accepted, m_dialog,
+                [this] {
+                    if (!validateAndShowErrors()) return;
+                    m_dialog->accept();
+                });
             QObject::connect(buttons, &QDialogButtonBox::rejected, m_dialog, &QDialog::reject);
         }
         if (statusLabel) {
@@ -331,13 +387,25 @@ public:
     }
 
 private:
+    // True if the dialog has all the required fields populated. Surfaces the
+    // inline error label next to the filename field on failure; the
+    // textChanged hook clears it as soon as the user starts typing.
+    bool validateAndShowErrors() {
+        if (!m_outFilenameEdit) return true;
+        const bool ok = !m_outFilenameEdit->text().trimmed().isEmpty();
+        if (m_outFilenameErrorLabel) m_outFilenameErrorLabel->setVisible(!ok);
+        return ok;
+    }
+
     QDialog              *m_dialog;
-    QVBoxLayout          *m_root          = nullptr;
-    QFormLayout          *m_form          = nullptr;
-    QWidget              *m_previewWidget = nullptr;
+    QVBoxLayout          *m_root                   = nullptr;
+    QFormLayout          *m_form                   = nullptr;
+    QWidget              *m_previewWidget          = nullptr;
     std::function<void()> m_previewOnResize;
-    QLineEdit            *m_outDirEdit    = nullptr;
-    QComboBox            *m_overwriteBox  = nullptr;
+    QLineEdit            *m_outDirEdit             = nullptr;
+    QComboBox            *m_overwriteBox           = nullptr;
+    QLineEdit            *m_outFilenameEdit        = nullptr;
+    QLabel               *m_outFilenameErrorLabel  = nullptr;
     std::function<void(const Outcome &)> m_applyCallback;
-    ActionLogger         *m_logger        = nullptr;
+    ActionLogger         *m_logger                 = nullptr;
 };

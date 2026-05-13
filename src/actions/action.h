@@ -90,6 +90,11 @@ protected:
 
     QString              m_outDir;
     WriteTarget::Overwrite m_overwrite = WriteTarget::Overwrite::Overwrite;
+    // Optional output-filename template with `{stem}` / `{ext}` placeholders;
+    // rendered per input inside resolveOutputPath. Empty (the default) keeps
+    // the input's filename verbatim — used by Copy/Move which have no
+    // filename UI.
+    QString              m_outFilenameTemplate;
 
 private:
     // Reset at the start of each apply(); inspected at the end for the

@@ -127,6 +127,7 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
     QObject::connect(sizeSpin,    &QSpinBox::valueChanged,         &dlg, updatePreview);
     updatePreview();
 
+    b.addOutputFilenameField(QStringLiteral("{stem}_captioned.{ext}"));
     b.addOutputControls(defaultOutDir, m_overwrite);
 
     // Apply/Close mode: Apply commits the current widget state into the
@@ -144,8 +145,9 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
         m_fg         = static_cast<Fg>(fgBox->currentData().toInt());
         m_fontFamily = fontBox->currentFont().family();
         m_pointSize  = sizeSpin->value();
-        m_outDir     = o.outDir;
-        m_overwrite  = o.overwrite;
+        m_outDir              = o.outDir;
+        m_overwrite           = o.overwrite;
+        m_outFilenameTemplate = o.outFilename;
         apply(inputs, logger);
     }, logger);
 

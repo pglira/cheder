@@ -8,6 +8,14 @@
 
 namespace WriteTarget {
 
+QString renderFilename(const QString &templateStr, const QString &inputPath) {
+    const QFileInfo fi(inputPath);
+    QString out = templateStr;
+    out.replace(QStringLiteral("{stem}"), fi.completeBaseName());
+    out.replace(QStringLiteral("{ext}"),  fi.suffix());
+    return out;
+}
+
 Resolved resolve(const QString &outDir,
                  const QString &filename,
                  Overwrite policy,

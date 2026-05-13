@@ -30,7 +30,10 @@ QStringList BatchAction::apply(const QStringList &inputs, ActionLogger *logger) 
 }
 
 QString BatchAction::resolveOutputPath(const QString &input, ActionLogger *logger) {
-    const auto r = WriteTarget::resolve(m_outDir, QFileInfo(input).fileName(),
+    const QString filename = m_outFilenameTemplate.isEmpty()
+        ? QFileInfo(input).fileName()
+        : WriteTarget::renderFilename(m_outFilenameTemplate, input);
+    const auto r = WriteTarget::resolve(m_outDir, filename,
                                         m_overwrite, logger, input);
     if (r.status == WriteTarget::ResolveStatus::Skip)   ++m_skippedThisRun;
     if (r.status == WriteTarget::ResolveStatus::Failed) ++m_failedThisRun;

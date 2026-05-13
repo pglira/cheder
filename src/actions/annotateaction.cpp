@@ -928,10 +928,6 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
     dlg.setWindowTitle("Annotate");
     ActionDialogBuilder b(&dlg, inputs, /*resizable=*/true);
 
-    const QString defaultName = QFileInfo(sourcePath).completeBaseName() + "_annotated.png";
-    auto *filenameEdit = new QLineEdit(
-        m_outFilename.isEmpty() ? defaultName : m_outFilename, &dlg);
-
     auto *canvas = new AnnotateCanvas(&dlg);
     canvas->setImage(source);
 
@@ -1145,8 +1141,8 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
     b.addRow("Stroke width", strokeRow);
     b.addRow("Font size",    fontRow);
     b.addRow("Font family",  fontFamilyBox);
-    b.addRow("Output file",  filenameEdit);
     b.setPreview(canvas);
+    b.addOutputFilenameField(QStringLiteral("{stem}_annotated.png"));
     b.addOutputControls(defaultOutDir, m_overwrite);
 
     // Ctrl+Z anywhere in the dialog. WindowShortcut context so the user can
@@ -1158,17 +1154,15 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
     QObject::connect(undoSc, &QShortcut::activated, &dlg,
                      [canvas, commitPre] { commitPre(); canvas->undo(); });
 
-    b.setApplyMode([this, inputs, logger, canvas, filenameEdit, commitPre]
+    b.setApplyMode([this, inputs, logger, canvas, commitPre]
                    (const ActionDialogBuilder::Outcome &o) {
-        const QString filename = filenameEdit->text().trimmed();
-        if (filename.isEmpty()) return;
         // Flush any in-flight style snapshot so the Apply re-renders the
         // currently-displayed canvas state, not a stale one.
         commitPre();
-        m_shapes      = canvas->shapes();
-        m_outDir      = o.outDir;
-        m_outFilename = filename;
-        m_overwrite   = o.overwrite;
+        m_shapes              = canvas->shapes();
+        m_outDir              = o.outDir;
+        m_outFilenameTemplate = o.outFilename;
+        m_overwrite           = o.overwrite;
         apply(inputs, logger);
     }, logger);
 
@@ -1204,7 +1198,9 @@ QStringList AnnotateAction::apply(const QStringList &inputs, ActionLogger *logge
             paintShape(painter, s, /*scale=*/1.0, /*translate=*/QPoint());
     }
 
-    const auto resolved = WriteTarget::resolve(m_outDir, m_outFilename,
+    const QString filename = WriteTarget::renderFilename(m_outFilenameTemplate,
+                                                         inputs.first());
+    const auto resolved = WriteTarget::resolve(m_outDir, filename,
                                                m_overwrite, logger);
     if (resolved.status != WriteTarget::ResolveStatus::Ok) {
         if (logger) logger->endRun(/*written=*/0,

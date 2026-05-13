@@ -59,6 +59,10 @@ private:
     QList<AnnotateShape> m_shapes;
 
     QString m_outDir;
-    QString m_outFilename;
+    // Output-filename template with `{stem}` / `{ext}` placeholders; rendered
+    // per apply() via WriteTarget::renderFilename. Default is `_annotated.png`
+    // (literal `.png`) so the alpha channel for annotation shapes survives
+    // even when the input is a JPEG.
+    QString m_outFilenameTemplate;
     WriteTarget::Overwrite m_overwrite = WriteTarget::Overwrite::Overwrite;
 };

@@ -28,13 +28,15 @@ bool RotateAction::configure(QWidget *parent, const QStringList &inputs, const Q
     b.addRow("Angle", cw);
     b.addRow("",      ccw);
     b.addRow("",      flip);
+    b.addOutputFilenameField(QStringLiteral("{stem}_rotated.{ext}"));
     b.addOutputControls(defaultOutDir, m_overwrite);
 
     const auto r = b.exec();
     if (!r.accepted) return false;
-    m_angle     = group->checkedId();
-    m_outDir    = r.outDir;
-    m_overwrite = r.overwrite;
+    m_angle               = group->checkedId();
+    m_outDir              = r.outDir;
+    m_overwrite           = r.overwrite;
+    m_outFilenameTemplate = r.outFilename;
     return true;
 }
 

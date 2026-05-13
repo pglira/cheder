@@ -28,6 +28,14 @@ struct Resolved {
     ResolveStatus status;
 };
 
+// Renders an output filename template against an input path. Substitutes
+// `{stem}` (input's completeBaseName) and `{ext}` (input's suffix without
+// dot). Literal extensions in the template are honored as-is — typing
+// `{stem}.png` against a JPEG input produces a PNG name, which is how
+// callers opt in to format conversion. Trim the template before passing;
+// this function does not.
+QString renderFilename(const QString &templateStr, const QString &inputPath);
+
 // Resolve `outDir/filename` under `policy`. Logs the reason on skip/fail.
 // `avoidIfSame` (when non-empty) makes Rename mode skip candidates that
 // resolve to that path — used by in-place 1→1 edits so the rename loop

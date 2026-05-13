@@ -423,6 +423,7 @@ bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QSt
     b.addRow(customLabel, customRow);
     if (inputsList) b.addRow("Image", inputsList);
     b.setPreview(preview);
+    b.addOutputFilenameField(QStringLiteral("{stem}_cropped.{ext}"));
     b.addOutputControls(defaultOutDir, m_overwrite);
 
     const auto r = b.exec();
@@ -430,9 +431,10 @@ bool CropAction::configure(QWidget *parent, const QStringList &inputs, const QSt
     const QRect rect = preview->rect();
     if (rect.isEmpty() || rect.width() < 1 || rect.height() < 1) return false;
 
-    m_rect      = rect;
-    m_outDir    = r.outDir;
-    m_overwrite = r.overwrite;
+    m_rect                = rect;
+    m_outDir              = r.outDir;
+    m_overwrite           = r.overwrite;
+    m_outFilenameTemplate = r.outFilename;
     return true;
 }
 
