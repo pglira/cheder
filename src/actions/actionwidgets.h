@@ -86,9 +86,18 @@ public:
                                      | Qt::WindowMinimizeButtonHint
                                      | Qt::WindowMaximizeButtonHint);
             m_dialog->setSizeGripEnabled(true);
-            // Preview-bearing dialogs benefit from real estate on first open;
-            // the user can still restore down via the window controls.
-            m_dialog->setWindowState(Qt::WindowMaximized);
+            // Preview-bearing dialogs open at 80% of the parent window's size
+            // and centered over it — large enough to give the preview room
+            // without fully covering MainWindow (which used to hide the log
+            // dock). User can still maximize via the window controls.
+            if (QWidget *p = m_dialog->parentWidget()) {
+                const int w = static_cast<int>(p->width()  * 0.8);
+                const int h = static_cast<int>(p->height() * 0.8);
+                m_dialog->resize(w, h);
+                const QPoint parentCenter = p->mapToGlobal(p->rect().center());
+                m_dialog->move(parentCenter.x() - w / 2,
+                               parentCenter.y() - h / 2);
+            }
         }
 
         m_root = new QVBoxLayout(m_dialog);
