@@ -1,5 +1,6 @@
 #pragma once
 
+#include "actionlogger.h"
 #include "writetarget.h"
 
 #include <QComboBox>
@@ -185,8 +186,14 @@ public:
     // dismisses without firing another apply. exec()'s return value's
     // `accepted` is true if at least one Apply happened during the session.
     // Used by actions that opt in via supportsMultiApply().
-    void setApplyMode(std::function<void(const Outcome &)> onApply) {
+    //
+    // Passing `logger` adds a one-line status strip above the buttons that
+    // mirrors the action's log output — without it, users running a maximized
+    // dialog see no feedback because the MainWindow log dock is hidden behind.
+    void setApplyMode(std::function<void(const Outcome &)> onApply,
+                      ActionLogger *logger = nullptr) {
         m_applyCallback = std::move(onApply);
+        m_logger        = logger;
     }
 
     // Snapshot of the current dialog state as an Outcome. Returns
@@ -258,6 +265,7 @@ public:
         // anything was committed.
         auto applied = std::make_shared<bool>(false);
         auto *buttons = new QDialogButtonBox(m_dialog);
+        QLabel *statusLabel = nullptr;
         if (m_applyCallback) {
             auto *applyBtn = buttons->addButton(QStringLiteral("Apply"),
                                                 QDialogButtonBox::ApplyRole);
@@ -272,13 +280,43 @@ public:
                 });
             QObject::connect(closeBtn, &QPushButton::clicked, m_dialog,
                              &QDialog::reject);
+
+            // Status label mirrors the ActionLogger so a maximized dialog
+            // (which fully covers MainWindow's log dock) still surfaces
+            // "[Action] done — wrote N, skipped M, failed K". m_dialog as
+            // connection context auto-disconnects when the dialog closes.
+            // Placed inline with the button box (see HBox below).
+            if (m_logger) {
+                statusLabel = new QLabel(m_dialog);
+                statusLabel->setTextFormat(Qt::PlainText);
+                statusLabel->setMinimumHeight(statusLabel->fontMetrics().lineSpacing());
+                QObject::connect(m_logger, &ActionLogger::logged, m_dialog,
+                    [statusLabel](int level, const QString &message) {
+                        const char *color =
+                            level == ActionLogger::Error ? "#cc0000" :
+                            level == ActionLogger::Warn  ? "#cc7700" : "";
+                        statusLabel->setStyleSheet(
+                            *color ? QString("color: %1;").arg(color)
+                                   : QString());
+                        statusLabel->setText(message);
+                        statusLabel->setToolTip(message);
+                    });
+            }
         } else {
             buttons->addButton(QDialogButtonBox::Ok);
             buttons->addButton(QDialogButtonBox::Cancel);
             QObject::connect(buttons, &QDialogButtonBox::accepted, m_dialog, &QDialog::accept);
             QObject::connect(buttons, &QDialogButtonBox::rejected, m_dialog, &QDialog::reject);
         }
-        m_root->addWidget(buttons);
+        if (statusLabel) {
+            auto *bottomRow = new QHBoxLayout;
+            bottomRow->setContentsMargins(0, 0, 0, 0);
+            bottomRow->addWidget(statusLabel, /*stretch=*/1);
+            bottomRow->addWidget(buttons);
+            m_root->addLayout(bottomRow);
+        } else {
+            m_root->addWidget(buttons);
+        }
 
         const int code = m_dialog->exec();
         if (m_applyCallback) {
@@ -301,4 +339,5 @@ private:
     QLineEdit            *m_outDirEdit    = nullptr;
     QComboBox            *m_overwriteBox  = nullptr;
     std::function<void(const Outcome &)> m_applyCallback;
+    ActionLogger         *m_logger        = nullptr;
 };

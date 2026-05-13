@@ -509,7 +509,7 @@ bool GridAction::configure(QWidget *parent, const QStringList &inputs, const QSt
         m_outFilename = filename;
         m_overwrite   = o.overwrite;
         apply(m_orderedInputs, logger);
-    });
+    }, logger);
 
     return b.exec().accepted;
 }

@@ -147,7 +147,7 @@ bool CaptionAction::configure(QWidget *parent, const QStringList &inputs, const 
         m_outDir     = o.outDir;
         m_overwrite  = o.overwrite;
         apply(inputs, logger);
-    });
+    }, logger);
 
     return b.exec().accepted;
 }

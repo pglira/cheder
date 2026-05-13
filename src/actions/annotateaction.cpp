@@ -1170,7 +1170,7 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
         m_outFilename = filename;
         m_overwrite   = o.overwrite;
         apply(inputs, logger);
-    });
+    }, logger);
 
     return b.exec().accepted;
 }

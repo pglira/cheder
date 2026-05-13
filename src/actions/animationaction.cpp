@@ -265,7 +265,7 @@ bool AnimationAction::configure(QWidget *parent, const QStringList &inputs, cons
         m_outFilename = filename;
         m_overwrite   = o.overwrite;
         apply(inputs, logger);
-    });
+    }, logger);
 
     return b.exec().accepted;
 }
