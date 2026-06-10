@@ -172,18 +172,33 @@ void MainWindow::wireKeyBindings() {
     bindThumb(Qt::Key_Equal,   [this] { m_thumbView->zoomIn();  });
     bindThumb(Qt::Key_Minus,   [this] { m_thumbView->zoomOut(); });
 
-    // Image view: nav / info-panel toggle / back to thumbnails.
+    // Image view: nav / zoom / pan / info-panel toggle / back to thumbnails.
+    // n/p are the only image navigation here; arrows (and hjkl via the vim
+    // translations above) pan the zoomed image instead, a no-op at fit zoom.
+    // Ctrl/Alt/Meta are forbidden (mirroring the q/m bindings) so combos like
+    // Ctrl+0 or Alt+1 don't zoom; Shift stays allowed for '+' and Backtab.
     auto bindImage = [this](Qt::Key k, KeyDispatcher::Handler h) {
-        m_keys.bind({k, {}, {}, Mode::Image, false, std::move(h)});
+        m_keys.bind({k, {},
+                     Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier,
+                     Mode::Image, false, std::move(h)});
     };
     auto back = [this] { showThumbnails(); };
     bindImage(Qt::Key_Tab,    back);
     bindImage(Qt::Key_Backtab, back);
     bindImage(Qt::Key_Escape,  back);
-    bindImage(Qt::Key_Right, [this] { m_imageView->next();     });
     bindImage(Qt::Key_N,     [this] { m_imageView->next();     });
-    bindImage(Qt::Key_Left,  [this] { m_imageView->previous(); });
     bindImage(Qt::Key_P,     [this] { m_imageView->previous(); });
+    bindImage(Qt::Key_Left,  [this] { m_imageView->panBy(-1, 0); });
+    bindImage(Qt::Key_Right, [this] { m_imageView->panBy( 1, 0); });
+    bindImage(Qt::Key_Up,    [this] { m_imageView->panBy(0, -1); });
+    bindImage(Qt::Key_Down,  [this] { m_imageView->panBy(0,  1); });
+    bindImage(Qt::Key_Plus,      [this] { m_imageView->zoomIn();      });
+    bindImage(Qt::Key_Equal,     [this] { m_imageView->zoomIn();      });
+    bindImage(Qt::Key_Minus,     [this] { m_imageView->zoomOut();     });
+    bindImage(Qt::Key_0,         [this] { m_imageView->zoomToFit();   });
+    bindImage(Qt::Key_Backslash, [this] { m_imageView->zoomToFit();   });
+    bindImage(Qt::Key_1,         [this] { m_imageView->zoomToActual(); });
+    bindImage(Qt::Key_B,         [this] { m_imageView->toggleInterpolation(); });
     bindImage(Qt::Key_I,     [this] {
         m_infoPanel->setVisible(!m_infoPanel->isVisible());
     });
