@@ -338,6 +338,13 @@ void MainWindow::runAction(Action *action) {
             // Move could have taken files away; in-place edits touch mtimes —
             // re-scan so the views match disk.
             reload();
+            // If the file the user was focused on was renamed/moved away (its
+            // input path no longer exists), follow it to its new name so it
+            // stays active instead of the view falling back to a neighbour.
+            // In-place edits and sibling-output actions leave the input on
+            // disk, so this no-ops and the views keep it active by path.
+            if (!QFileInfo::exists(inputs.first()))
+                activatePath(outputs.first());
         }
     }
     m_actionPane->resetState();
@@ -472,6 +479,15 @@ void MainWindow::copySelectionImagesToClipboard() {
 void MainWindow::returnFocusToView() {
     if (inThumbnailView()) m_thumbView->setFocus();
     else                   m_imageView->setFocus();
+}
+
+void MainWindow::activatePath(const QString &path) {
+    const int idx = m_fileModel->indexOf(path);
+    if (idx < 0) return;
+    if (inThumbnailView())
+        m_thumbView->setCurrentRow(idx, QItemSelectionModel::ClearAndSelect);
+    else
+        m_imageView->setIndex(idx);
 }
 
 void MainWindow::reload() {

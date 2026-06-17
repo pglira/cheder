@@ -38,6 +38,10 @@ private:
     QStringList selectionPaths() const;
     QStringList currentInputs() const;
     QString defaultOutputDirFor(const Action *action) const;
+    // Makes `path` the active file in whichever view is showing, selecting it
+    // (and clearing any other selection) in the thumbnail view. No-op if the
+    // path isn't in the current listing.
+    void activatePath(const QString &path);
     void runAction(Action *action);
     void deleteCurrentInputs();
     void copySelectionImagesToClipboard();

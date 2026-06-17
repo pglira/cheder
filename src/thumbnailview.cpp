@@ -139,19 +139,31 @@ void ThumbnailView::rebuildItems() {
     QSet<QString> previouslySelected;
     for (auto *it : selectedItems())
         previouslySelected.insert(it->data(Qt::UserRole).toString());
+    // Track the current item by path, not by row: a rename can shift the
+    // file's position in the sorted listing, so the old index would point
+    // at a different file (selection is preserved by path for the same
+    // reason). Fall back to clamping the old row only if the path is gone.
+    const QString prevCurrentPath =
+        currentItem() ? currentItem()->data(Qt::UserRole).toString() : QString();
     const int prevCurrentRow = currentRow();
 
     clear();
     const QPixmap placeholder = placeholderPixmap(iconSize());
-    for (const QString &path : m_model->files()) {
+    int currentRowToRestore = -1;
+    const QStringList &files = m_model->files();
+    for (int i = 0; i < files.size(); ++i) {
+        const QString &path = files.at(i);
         auto *item = new QListWidgetItem(QIcon(placeholder), QString(), this);
         item->setData(Qt::UserRole, path);
         item->setToolTip(path);
         item->setSizeHint(gridSize());
         if (previouslySelected.contains(path)) item->setSelected(true);
+        if (path == prevCurrentPath) currentRowToRestore = i;
     }
-    if (prevCurrentRow >= 0 && prevCurrentRow < count())
-        setCurrentRow(prevCurrentRow);
+    if (currentRowToRestore < 0 && prevCurrentRow >= 0 && prevCurrentRow < count())
+        currentRowToRestore = prevCurrentRow;
+    if (currentRowToRestore >= 0)
+        setCurrentRow(currentRowToRestore);
 }
 
 void ThumbnailView::startLoading() {
