@@ -173,21 +173,27 @@ void MainWindow::wireKeyBindings() {
     bindThumb(Qt::Key_Minus,   [this] { m_thumbView->zoomOut(); });
 
     // Image view: nav / zoom / pan / info-panel toggle / back to thumbnails.
-    // n/p are the only image navigation here; arrows (and hjkl via the vim
+    // n/N are the only image navigation here; arrows (and hjkl via the vim
     // translations above) pan the zoomed image instead, a no-op at fit zoom.
-    // Ctrl/Alt/Meta are forbidden (mirroring the q/m bindings) so combos like
-    // Ctrl+0 or Alt+1 don't zoom; Shift stays allowed for '+' and Backtab.
-    auto bindImage = [this](Qt::Key k, KeyDispatcher::Handler h) {
-        m_keys.bind({k, {},
-                     Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier,
-                     Mode::Image, false, std::move(h)});
+    // Ctrl/Alt/Meta are forbidden on every image binding (mirroring the q/m
+    // bindings) so combos like Ctrl+0 or Alt+1 don't zoom; Shift stays allowed
+    // for '+' and Backtab.
+    const auto noCombo =
+        Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier;
+    auto bindImage = [this, noCombo](Qt::Key k, KeyDispatcher::Handler h) {
+        m_keys.bind({k, {}, noCombo, Mode::Image, false, std::move(h)});
     };
     auto back = [this] { showThumbnails(); };
     bindImage(Qt::Key_Tab,    back);
     bindImage(Qt::Key_Backtab, back);
     bindImage(Qt::Key_Escape,  back);
-    bindImage(Qt::Key_N,     [this] { m_imageView->next();     });
-    bindImage(Qt::Key_P,     [this] { m_imageView->previous(); });
+    // n and Shift+N step forward / backward through the directory. Shift is
+    // what tells them apart, so 'next' additionally forbids it while
+    // 'previous' requires it.
+    m_keys.bind({Qt::Key_N, {}, noCombo | Qt::ShiftModifier, Mode::Image, false,
+                 [this] { m_imageView->next(); }});
+    m_keys.bind({Qt::Key_N, Qt::ShiftModifier, noCombo, Mode::Image, false,
+                 [this] { m_imageView->previous(); }});
     bindImage(Qt::Key_Left,  [this] { m_imageView->panBy(-1, 0); });
     bindImage(Qt::Key_Right, [this] { m_imageView->panBy( 1, 0); });
     bindImage(Qt::Key_Up,    [this] { m_imageView->panBy(0, -1); });

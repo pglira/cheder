@@ -38,7 +38,7 @@ Optional external tools:
 
 ### Image view
 
-- arrow keys / `n` / `p` — next / previous image
+- arrow keys / `n` / `N` — next / previous image
 - `i` — toggle the info panel
 - `Tab` / `Esc` — back to the thumbnail view
 
