@@ -4,6 +4,7 @@ project(cheder LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
@@ -59,6 +60,8 @@ add_executable(cheder
     src/actions/resizeaction.h
     src/actions/rotateaction.cpp
     src/actions/rotateaction.h
+
+    data/icons.qrc
 )
 target_include_directories(cheder PRIVATE src)
 target_link_libraries(cheder PRIVATE Qt6::Widgets)
@@ -67,3 +70,13 @@ include(GNUInstallDirs)
 install(TARGETS cheder RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/cheder.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+
+# Application icon in the hicolor theme, so launchers and window managers
+# resolve the "cheder" icon name from the .desktop entry.
+foreach(sz 16 22 24 32 48 64 128 256)
+    install(FILES data/icons/cheder-${sz}.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${sz}x${sz}/apps
+        RENAME cheder.png)
+endforeach()
+install(FILES data/cheder.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)

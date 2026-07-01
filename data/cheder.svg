@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ec6ff"/>
+      <stop offset="1" stop-color="#4f7cff"/>
+    </linearGradient>
+    <linearGradient id="hillFar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3ad6b0"/>
+      <stop offset="1" stop-color="#27b394"/>
+    </linearGradient>
+    <linearGradient id="hillNear" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f9e86"/>
+      <stop offset="1" stop-color="#137a67"/>
+    </linearGradient>
+    <clipPath id="tile">
+      <rect x="24" y="24" width="208" height="208" rx="46"/>
+    </clipPath>
+  </defs>
+
+  <!-- App tile: a landscape framed like a photo -->
+  <g clip-path="url(#tile)">
+    <rect x="24" y="24" width="208" height="208" fill="url(#sky)"/>
+    <!-- Sun -->
+    <circle cx="178" cy="86" r="26" fill="#ffd15c"/>
+    <!-- Rolling hills -->
+    <path d="M24 176 L92 118 L150 168 L200 128 L232 156 L232 232 L24 232 Z" fill="url(#hillFar)"/>
+    <path d="M24 232 L24 190 L84 152 L146 200 L206 162 L232 184 L232 232 Z" fill="url(#hillNear)"/>
+  </g>
+
+  <!-- Photo-frame border -->
+  <rect x="24" y="24" width="208" height="208" rx="46" fill="none" stroke="#ffffff" stroke-width="12"/>
+</svg>

@@ -68,10 +68,16 @@ bool resolveStartupInput(const QString &filePath, const QString &dirPath, Startu
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setApplicationName("cheder");
-    // Belt-and-suspenders icon source for window managers: Qt sets _NET_WM_ICON
-    // from this, and the .desktop file (with matching StartupWMClass=cheder)
-    // covers the launcher entry. Falls back gracefully if the theme lacks it.
-    app.setWindowIcon(QIcon::fromTheme("image-x-generic"));
+    // Ties the window to the installed cheder.desktop entry so Wayland shells
+    // show its icon and group its windows.
+    app.setDesktopFileName("cheder");
+    // Window icon (X11 _NET_WM_ICON / task-switcher / title bar). The sizes are
+    // baked into the binary so the icon shows without the app being installed;
+    // the .desktop file plus the hicolor theme cover the launcher separately.
+    QIcon appIcon;
+    for (int sz : {16, 24, 32, 48, 64, 128, 256})
+        appIcon.addFile(QStringLiteral(":/icons/cheder-%1.png").arg(sz));
+    app.setWindowIcon(appIcon);
 
     QString filePath, dirPath;
 

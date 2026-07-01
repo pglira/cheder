@@ -1,0 +1,12 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/icons">
+    <file alias="cheder-16.png">icons/cheder-16.png</file>
+    <file alias="cheder-24.png">icons/cheder-24.png</file>
+    <file alias="cheder-32.png">icons/cheder-32.png</file>
+    <file alias="cheder-48.png">icons/cheder-48.png</file>
+    <file alias="cheder-64.png">icons/cheder-64.png</file>
+    <file alias="cheder-128.png">icons/cheder-128.png</file>
+    <file alias="cheder-256.png">icons/cheder-256.png</file>
+  </qresource>
+</RCC>
