@@ -128,13 +128,12 @@ void MainWindow::wireKeyBindings() {
     m_keys.bind({Qt::Key_C, Qt::ControlModifier, {}, Mode::Anywhere, false,
                  [this] { copySelectionImagesToClipboard(); }});
 
-    // Plain 'm' (no modifier) sends the current selection to dungeon. The
-    // forbidden-modifier set excludes capital M (Shift) and combos like
-    // Alt+M (reserved for the Copy or Move action) so this binding only
-    // fires for unmodified, lowercase 'm'. fireWhileInputFocused=false
-    // lets the action-bar filter still receive 'm' as a typed letter.
-    m_keys.bind({Qt::Key_M, {},
-                 Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier,
+    // Ctrl+D sends the current selection to dungeon. Requiring Ctrl and
+    // forbidding the other modifiers pins it to exactly Ctrl+D, keeping it
+    // distinct from the bare 'd' that starts the dd delete sequence.
+    // fireWhileInputFocused=false leaves plain 'd' typeable in the action bar.
+    m_keys.bind({Qt::Key_D, Qt::ControlModifier,
+                 Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier,
                  Mode::Anywhere, false,
                  [this] { sendSelectionToDungeon(); }});
 
