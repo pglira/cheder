@@ -8,9 +8,21 @@
 // Decode `path` into a QImage, honoring EXIF orientation. Returns a null
 // QImage on failure. Single point so the QImageReader + setAutoTransform(true)
 // pattern doesn't live in six different .cpp files.
+//
+// Sources whose raw pixel buffer would exceed Qt's image allocation limit are
+// rejected up front rather than handed to QImageReader::read(): letting the
+// reader attempt and then reject the allocation corrupts memory in a way
+// that's only sometimes fatal, so the on-disk dimensions are checked first to
+// avoid exercising that path at all.
 inline QImage readImage(const QString &path) {
     QImageReader reader(path);
     reader.setAutoTransform(true);
+    const QSize size = reader.size();
+    if (size.isValid()) {
+        const qint64 maxBytes = qint64(QImageReader::allocationLimit()) * 1024 * 1024;
+        const qint64 rawBytes = qint64(size.width()) * qint64(size.height()) * 4;
+        if (maxBytes > 0 && rawBytes > maxBytes) return QImage();
+    }
     return reader.read();
 }
 
