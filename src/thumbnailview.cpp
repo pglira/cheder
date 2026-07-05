@@ -4,6 +4,7 @@
 #include "imageio.h"
 #include "thumbnailcache.h"
 
+#include <QHash>
 #include <QIcon>
 #include <QPainter>
 #include <QPixmap>
@@ -157,26 +158,46 @@ void ThumbnailView::rebuildItems() {
     // Track the current item by path, not by row: a rename can shift the
     // file's position in the sorted listing, so the old index would point
     // at a different file (selection is preserved by path for the same
-    // reason). Fall back to clamping the old row only if the path is gone.
-    const QString prevCurrentPath =
-        currentItem() ? currentItem()->data(Qt::UserRole).toString() : QString();
+    // reason).
     const int prevCurrentRow = currentRow();
+    const QString prevCurrentPath =
+        prevCurrentRow >= 0 ? item(prevCurrentRow)->data(Qt::UserRole).toString() : QString();
 
-    clear();
+    // Build the new items off-widget first (old items — and thus old
+    // rows/paths — stay readable via item()/count() below) and index them by
+    // path for O(1) lookups instead of a linear indexOf() per candidate.
     const QPixmap placeholder = placeholderPixmap(iconSize());
-    int currentRowToRestore = -1;
     const QStringList &files = m_model->files();
+    QHash<QString, int> newRowOf;
+    newRowOf.reserve(files.size());
+    QList<QListWidgetItem *> newItems;
+    newItems.reserve(files.size());
     for (int i = 0; i < files.size(); ++i) {
         const QString &path = files.at(i);
-        auto *item = new QListWidgetItem(QIcon(placeholder), QString(), this);
-        item->setData(Qt::UserRole, path);
-        item->setToolTip(path);
-        item->setSizeHint(gridSize());
-        if (previouslySelected.contains(path)) item->setSelected(true);
-        if (path == prevCurrentPath) currentRowToRestore = i;
+        auto *it = new QListWidgetItem(QIcon(placeholder), QString());
+        it->setData(Qt::UserRole, path);
+        it->setToolTip(path);
+        it->setSizeHint(gridSize());
+        if (previouslySelected.contains(path)) it->setSelected(true);
+        newItems << it;
+        newRowOf.insert(path, i);
     }
-    if (currentRowToRestore < 0 && prevCurrentRow >= 0 && prevCurrentRow < count())
-        currentRowToRestore = prevCurrentRow;
+
+    int currentRowToRestore = newRowOf.value(prevCurrentPath, -1);
+    if (currentRowToRestore < 0 && prevCurrentRow >= 0) {
+        // The previously-current file is gone: scan outward through the old
+        // widget ordering for the nearest survivor, preferring the next file
+        // so a delete or move-away advances the cursor instead of stalling
+        // it.
+        const int oldCount = count();
+        for (int i = prevCurrentRow + 1; i < oldCount && currentRowToRestore < 0; ++i)
+            currentRowToRestore = newRowOf.value(item(i)->data(Qt::UserRole).toString(), -1);
+        for (int i = prevCurrentRow - 1; i >= 0 && currentRowToRestore < 0; --i)
+            currentRowToRestore = newRowOf.value(item(i)->data(Qt::UserRole).toString(), -1);
+    }
+
+    clear();
+    for (auto *it : newItems) addItem(it);
     if (currentRowToRestore >= 0)
         setCurrentRow(currentRowToRestore);
 }
