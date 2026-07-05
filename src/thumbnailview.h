@@ -33,6 +33,7 @@ public:
 
 protected:
     void wheelEvent(QWheelEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private:
     void onFilesChanged();
@@ -43,5 +44,6 @@ private:
     FileListModel *m_model;
     int m_loadIndex = 0;
     qint64 m_generation = 0;
+    bool m_loadPending = false;
     std::unique_ptr<ThumbnailCache> m_cache;
 };

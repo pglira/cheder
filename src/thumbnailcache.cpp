@@ -22,6 +22,17 @@ const char *const kVersionKey = "Thumb::Cheder::Version";
 // aspect ratio and honoring EXIF orientation. Already-small sources are
 // returned untouched — never upscale a thumbnail.
 QImage composeCanonical(const QString &sourcePath) {
+    // Skip the decode for sources whose raw pixel buffer would exceed Qt's
+    // image allocation limit: QImageReader::read() would just reject them
+    // after attempting the allocation, so checking the on-disk dimensions
+    // first avoids exercising that path at all for a mere thumbnail.
+    const QSize size = peekImageSize(sourcePath);
+    if (size.isValid()) {
+        const qint64 maxBytes = qint64(QImageReader::allocationLimit()) * 1024 * 1024;
+        const qint64 rawBytes = qint64(size.width()) * qint64(size.height()) * 4;
+        if (maxBytes > 0 && rawBytes > maxBytes) return QImage();
+    }
+
     const QImage img = readImage(sourcePath);
     if (img.isNull()) return QImage();
     if (img.width() <= kCanonicalMaxSize && img.height() <= kCanonicalMaxSize)

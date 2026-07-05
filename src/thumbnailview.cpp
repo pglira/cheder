@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QSet>
+#include <QShowEvent>
 #include <QTimer>
 #include <QWheelEvent>
 
@@ -108,7 +109,21 @@ void ThumbnailView::wheelEvent(QWheelEvent *event) {
 
 void ThumbnailView::onFilesChanged() {
     rebuildItems();
-    startLoading();
+    // Decoding is deferred while the grid is hidden behind the image view (the
+    // common case when cheder is launched on a single file) so the startup
+    // window-mapping sequence isn't competing with a background decode of
+    // every file in the directory; loading starts once the grid is actually
+    // shown (see showEvent()).
+    if (isVisible()) startLoading();
+    else             m_loadPending = true;
+}
+
+void ThumbnailView::showEvent(QShowEvent *event) {
+    QListWidget::showEvent(event);
+    if (m_loadPending) {
+        m_loadPending = false;
+        startLoading();
+    }
 }
 
 int ThumbnailView::firstSelectedRow() const {
