@@ -128,11 +128,11 @@ void MainWindow::wireKeyBindings() {
     m_keys.bind({Qt::Key_C, Qt::ControlModifier, {}, Mode::Anywhere, false,
                  [this] { copySelectionImagesToClipboard(); }});
 
-    // Ctrl+D sends the current selection to dungeon. Requiring Ctrl and
-    // forbidding the other modifiers pins it to exactly Ctrl+D, keeping it
-    // distinct from the bare 'd' that starts the dd delete sequence.
-    // fireWhileInputFocused=false leaves plain 'd' typeable in the action bar.
-    m_keys.bind({Qt::Key_D, Qt::ControlModifier,
+    // Ctrl+G sends the current selection to dungeon. Requiring Ctrl and
+    // forbidding the other modifiers pins it to exactly Ctrl+G, keeping it
+    // distinct from the bare 'g' that starts the gg sequence and from Shift+G.
+    // fireWhileInputFocused=false leaves plain 'g' typeable in the action bar.
+    m_keys.bind({Qt::Key_G, Qt::ControlModifier,
                  Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier,
                  Mode::Anywhere, false,
                  [this] { sendSelectionToDungeon(); }});
