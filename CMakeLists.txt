@@ -10,6 +10,8 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 add_executable(cheder
     src/main.cpp
+    src/exifthumbnail.cpp
+    src/exifthumbnail.h
     src/filelistmodel.h
     src/imagedir.h
     src/imageio.h

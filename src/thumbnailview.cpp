@@ -4,16 +4,17 @@
 #include "imageio.h"
 #include "thumbnailcache.h"
 
-#include <QHash>
 #include <QIcon>
+#include <QImage>
 #include <QPainter>
-#include <QPixmap>
-#include <QSet>
+#include <QResizeEvent>
 #include <QShowEvent>
-#include <QTimer>
+#include <QThread>
 #include <QWheelEvent>
 
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -23,6 +24,10 @@ constexpr int kThumbSizeMin     = 64;
 constexpr int kThumbSizeMax     = 512;
 constexpr int kGridPaddingW     = 8;
 constexpr int kGridPaddingH     = 8;
+
+// Scrolling and resizing emit their signals in bursts; this is how long the
+// view waits for one to settle before deciding what to decode.
+constexpr int kScheduleDelayMs = 50;
 
 const QColor kPlaceholderColor(40, 40, 40);
 
@@ -75,11 +80,27 @@ ThumbnailView::ThumbnailView(FileListModel *model, QWidget *parent)
     setWordWrap(true);
     setTextElideMode(Qt::ElideMiddle);
 
+    // Leave a core to the GUI thread so decoding never starves painting and
+    // input handling.
+    m_pool.setMaxThreadCount(std::max(1, QThread::idealThreadCount() - 1));
+
+    m_scheduleTimer.setSingleShot(true);
+    m_scheduleTimer.setInterval(kScheduleDelayMs);
+    connect(&m_scheduleTimer, &QTimer::timeout, this,
+            &ThumbnailView::generateThumbnailsForItems);
+
     connect(m_model, &FileListModel::filesChanged, this, &ThumbnailView::onFilesChanged);
     onFilesChanged();
 }
 
-ThumbnailView::~ThumbnailView() = default;
+ThumbnailView::~ThumbnailView() {
+    // Jobs hold `this` and the cache, so they must all be done before any
+    // member is destroyed. Bumping the generation first means the ones already
+    // running discard their results instead of touching a half-torn-down view.
+    ++m_generation;
+    m_pool.clear();
+    m_pool.waitForDone();
+}
 
 int ThumbnailView::thumbnailSize() const {
     return iconSize().width();
@@ -91,7 +112,7 @@ void ThumbnailView::setThumbnailSize(int size) {
     setIconSize(QSize(size, size));
     setGridSize(gridSizeFor(size));
     rebuildItems();
-    startLoading();
+    scheduleThumbnailGeneration();
 }
 
 void ThumbnailView::zoomIn()  { setThumbnailSize(thumbnailSize() + kThumbSizeStep); }
@@ -110,21 +131,28 @@ void ThumbnailView::wheelEvent(QWheelEvent *event) {
 
 void ThumbnailView::onFilesChanged() {
     rebuildItems();
-    // Decoding is deferred while the grid is hidden behind the image view (the
-    // common case when cheder is launched on a single file) so the startup
-    // window-mapping sequence isn't competing with a background decode of
-    // every file in the directory; loading starts once the grid is actually
-    // shown (see showEvent()).
-    if (isVisible()) startLoading();
-    else             m_loadPending = true;
+    // A pass over a hidden grid decodes nothing: the viewport geometry it would
+    // scan is not meaningful yet, so generateThumbnailsForItems() bails out and
+    // showEvent() asks again once the grid is up. That keeps the startup
+    // window-mapping sequence free of background decodes when cheder opens
+    // straight into the image view.
+    scheduleThumbnailGeneration();
 }
 
 void ThumbnailView::showEvent(QShowEvent *event) {
     QListWidget::showEvent(event);
-    if (m_loadPending) {
-        m_loadPending = false;
-        startLoading();
-    }
+    scheduleThumbnailGeneration();
+}
+
+void ThumbnailView::resizeEvent(QResizeEvent *event) {
+    QListWidget::resizeEvent(event);
+    // Resizing reflows the grid, so a different set of items is on screen.
+    scheduleThumbnailGeneration();
+}
+
+void ThumbnailView::scrollContentsBy(int dx, int dy) {
+    QListWidget::scrollContentsBy(dx, dy);
+    scheduleThumbnailGeneration();
 }
 
 int ThumbnailView::firstSelectedRow() const {
@@ -163,10 +191,16 @@ void ThumbnailView::rebuildItems() {
     const QString prevCurrentPath =
         prevCurrentRow >= 0 ? item(prevCurrentRow)->data(Qt::UserRole).toString() : QString();
 
+    // Every item is about to be recreated carrying a placeholder icon, so
+    // results still in flight describe a grid that no longer exists.
+    ++m_generation;
+    m_loaded.clear();
+    m_inFlight.clear();
+    m_placeholder = placeholderPixmap(iconSize());
+
     // Build the new items off-widget first (old items — and thus old
     // rows/paths — stay readable via item()/count() below) and index them by
     // path for O(1) lookups instead of a linear indexOf() per candidate.
-    const QPixmap placeholder = placeholderPixmap(iconSize());
     const QStringList &files = m_model->files();
     QHash<QString, int> newRowOf;
     newRowOf.reserve(files.size());
@@ -174,7 +208,7 @@ void ThumbnailView::rebuildItems() {
     newItems.reserve(files.size());
     for (int i = 0; i < files.size(); ++i) {
         const QString &path = files.at(i);
-        auto *it = new QListWidgetItem(QIcon(placeholder), QString());
+        auto *it = new QListWidgetItem(QIcon(m_placeholder), QString());
         it->setData(Qt::UserRole, path);
         it->setToolTip(path);
         it->setSizeHint(gridSize());
@@ -198,39 +232,101 @@ void ThumbnailView::rebuildItems() {
 
     clear();
     for (auto *it : newItems) addItem(it);
+    m_rowOf = std::move(newRowOf);
     if (currentRowToRestore >= 0)
         setCurrentRow(currentRowToRestore);
 }
 
-void ThumbnailView::startLoading() {
-    ++m_generation;
-    m_loadIndex = 0;
-    const qint64 gen = m_generation;
-    QTimer::singleShot(0, this, [this, gen] { loadNext(gen); });
+void ThumbnailView::scheduleThumbnailGeneration() {
+    if (!m_scheduleTimer.isActive()) m_scheduleTimer.start();
 }
 
-void ThumbnailView::loadNext(qint64 generation) {
-    if (generation != m_generation) return;
-    const QStringList &files = m_model->files();
-    if (m_loadIndex >= files.size()) return;
+void ThumbnailView::generateThumbnailsForItems() {
+    if (!isVisible() || count() == 0) return;
 
-    const int row = m_loadIndex++;
-    const QString &path = files.at(row);
-    const QPixmap raw = m_cache->getThumbnail(path, iconSize());
-    if (generation == m_generation && !raw.isNull()) {
-        // Pad to a square iconSize pixmap so every cell is the same size and
-        // the icon area in QListView paints predictably.
-        QPixmap padded(iconSize());
-        padded.setDevicePixelRatio(1.0);
-        padded.fill(kPlaceholderColor);
-        QPainter p(&padded);
-        p.drawPixmap((iconSize().width()  - raw.width())  / 2,
-                     (iconSize().height() - raw.height()) / 2, raw);
-        if (isGifPath(path))
-            drawAnimatedBadge(p, iconSize());
-        p.end();
-        if (auto *it = item(row)) it->setIcon(QIcon(padded));
+    const QRect visible = viewport()->rect();
+    const int visibleSurface = visible.width() * visible.height();
+    const QPoint origin = visible.center();
+    // Decode a screen's worth beyond the viewport so scrolling lands on
+    // thumbnails that are already there, and release anything twice that far
+    // out so a large directory does not accumulate every icon it ever showed.
+    const int prefetchDistance = visible.bottomRight().manhattanLength();
+    const int discardDistance  = prefetchDistance * 2;
+
+    std::vector<std::pair<int, int>> candidates;   // (distance, row)
+
+    for (int r = 0; r < count(); ++r) {
+        auto *it = item(r);
+        const QString path = it->data(Qt::UserRole).toString();
+        const QRect rect = visualItemRect(it);
+
+        int distance;
+        if (rect.intersects(visible)) {
+            // On screen: work left to right, top to bottom, so thumbnails
+            // appear in the order the eye reads them.
+            distance = rect.top() * visible.width() + rect.left();
+        } else {
+            const int away = (rect.center() - origin).manhattanLength();
+            if (away > discardDistance) {
+                if (m_loaded.remove(path)) it->setIcon(QIcon(m_placeholder));
+                continue;
+            }
+            if (away > prefetchDistance) continue;
+            // Offset past the largest possible on-screen distance so every
+            // visible item is decoded before any prefetched one.
+            distance = visibleSurface + away;
+        }
+
+        if (m_loaded.contains(path) || m_inFlight.contains(path)) continue;
+        candidates.emplace_back(distance, r);
     }
 
-    QTimer::singleShot(0, this, [this, generation] { loadNext(generation); });
+    if (candidates.empty()) return;
+    std::sort(candidates.begin(), candidates.end());
+
+    const qint64 generation = m_generation;
+    const int size = iconSize().width();
+    ThumbnailCache *cache = m_cache.get();
+
+    for (const auto &[distance, r] : candidates) {
+        const QString path = item(r)->data(Qt::UserRole).toString();
+        m_inFlight.insert(path);
+        // Higher priority runs first, so negating the distance keeps the
+        // queue ordered by nearness even as scrolling appends to it.
+        m_pool.start([this, cache, path, size, generation] {
+            const QImage image = cache->thumbnail(path, size);
+            QMetaObject::invokeMethod(this, [this, path, image, generation] {
+                applyThumbnail(path, image, generation);
+            }, Qt::QueuedConnection);
+        }, -distance);
+    }
+}
+
+void ThumbnailView::applyThumbnail(const QString &path, const QImage &image,
+                                   qint64 generation) {
+    // A stale result predates the current grid; its bookkeeping was already
+    // discarded when the generation was bumped, so there is nothing to undo.
+    if (generation != m_generation) return;
+    m_inFlight.remove(path);
+    if (image.isNull()) return;
+
+    const int row = m_rowOf.value(path, -1);
+    auto *it = row >= 0 ? item(row) : nullptr;
+    if (!it) return;
+
+    // Pad to a square iconSize pixmap so every cell is the same size and
+    // the icon area in QListView paints predictably.
+    QPixmap padded(iconSize());
+    padded.setDevicePixelRatio(1.0);
+    padded.fill(kPlaceholderColor);
+    QPainter p(&padded);
+    p.drawPixmap((iconSize().width()  - image.width())  / 2,
+                 (iconSize().height() - image.height()) / 2,
+                 QPixmap::fromImage(image));
+    if (isGifPath(path))
+        drawAnimatedBadge(p, iconSize());
+    p.end();
+
+    it->setIcon(QIcon(padded));
+    m_loaded.insert(path);
 }
