@@ -58,7 +58,7 @@ The action bar at the bottom of the window lists actions; type to filter,
 `Enter` to invoke. Built-in:
 
 - **Animation** (`Alt+A`) — build an animated GIF or H.264 MP4 from ≥2 same-size frames; FPS, loop count (GIF), quality (MP4), live frame-flip preview
-- **Annotate** (`Alt+D`) — draw rectangles, circles, arrows, and text on a single image with per-shape color / stroke / font; select-and-edit with handles, double-click to retype text, `Ctrl+Z` to undo
+- **Annotate** (`Alt+D`) — draw rectangles, circles, lines, arrows, and text on a single image with per-shape color / stroke / font; select-and-edit with handles, double-click to retype text, `Ctrl+Z` to undo
 - **Caption** (`Alt+T`) — add a text caption above or below a single image (live preview)
 - **Concatenate** (`Alt+N`) — stitch ≥2 selected images horizontally or vertically (target axis, spacing, background)
 - **Copy or move** (`Alt+M`) — duplicate or relocate to a chosen directory

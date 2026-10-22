@@ -45,7 +45,13 @@
 
 namespace {
 
-enum class Tool { None, Rect, Circle, Arrow, Text, Select };
+enum class Tool { None, Rect, Circle, Line, Arrow, Text, Select };
+
+// Line and Arrow are both two-endpoint segments stored in p1/p2; they share
+// hit testing, endpoint handles, and drag behavior and differ only in paint.
+bool isSegment(AnnotateShapeType t) {
+    return t == AnnotateShapeType::Line || t == AnnotateShapeType::Arrow;
+}
 
 // Programmatic tool-button icons. Drawing them at runtime keeps the action
 // self-contained (no resource files, no theme-specific bitmaps) and lets the
@@ -68,6 +74,9 @@ QPixmap makeToolIcon(Tool tool, const QColor &color, int size) {
         break;
     case Tool::Circle:
         p.drawEllipse(QRectF(3, 3, size - 6, size - 6));
+        break;
+    case Tool::Line:
+        p.drawLine(QPointF(4, size - 4), QPointF(size - 4, 4));
         break;
     case Tool::Arrow: {
         const QPointF tail(4, size - 4);
@@ -116,7 +125,7 @@ QPixmap makeToolIcon(Tool tool, const QColor &color, int size) {
 
 // Active Select-tool interaction. MoveShape drags the whole shape; the box
 // handles map to which corner/edge of the bounding box follows the cursor;
-// the arrow handles each pin one endpoint to the cursor.
+// the segment (Line, Arrow) handles each pin one endpoint to the cursor.
 enum class DragMode {
     None,
     MoveShape,
@@ -143,6 +152,7 @@ QRect shapeSourceBBox(const AnnotateShape &s) {
     case AnnotateShapeType::Rect:
     case AnnotateShapeType::Circle:
         return s.rect.normalized().adjusted(-half, -half, half, half);
+    case AnnotateShapeType::Line:
     case AnnotateShapeType::Arrow: {
         QRect r(s.p1, s.p2);
         return r.normalized().adjusted(-half, -half, half, half);
@@ -157,8 +167,8 @@ QRect shapeSourceBBox(const AnnotateShape &s) {
     return {};
 }
 
-// Distance from point `q` to the line segment (a, b). Used for arrow hit
-// testing — bbox alone is too generous on diagonal arrows.
+// Distance from point `q` to the line segment (a, b). Used for line and
+// arrow hit testing — bbox alone is too generous on diagonal segments.
 double segmentDistance(QPointF q, QPointF a, QPointF b) {
     const QPointF ab = b - a;
     const QPointF aq = q - a;
@@ -177,6 +187,7 @@ bool hitShape(const AnnotateShape &s, QPoint p) {
     case AnnotateShapeType::Text:
         return shapeSourceBBox(s).adjusted(-qRound(tol), -qRound(tol),
                                            qRound(tol),  qRound(tol)).contains(p);
+    case AnnotateShapeType::Line:
     case AnnotateShapeType::Arrow:
         return segmentDistance(QPointF(p), QPointF(s.p1), QPointF(s.p2)) <= tol;
     }
@@ -219,11 +230,11 @@ QRectF handleRectAt(QPointF center) {
 
 // Returns the handle the mouse is over (in display coords) for the given
 // selected shape — or DragMode::None if no handle is hit. Rect/Circle have
-// 8 box handles; Arrow has 2 endpoint handles; Text has none (font size
-// controls its dimensions).
+// 8 box handles; Line and Arrow have 2 endpoint handles; Text has none
+// (font size controls its dimensions).
 DragMode hitHandle(QPointF mouseDisp, const AnnotateShape &s,
                    double scale, QPoint translate) {
-    if (s.type == AnnotateShapeType::Arrow) {
+    if (isSegment(s.type)) {
         const QPointF tail(translate.x() + s.p1.x() * scale,
                            translate.y() + s.p1.y() * scale);
         const QPointF head(translate.x() + s.p2.x() * scale,
@@ -299,6 +310,7 @@ void translateShape(AnnotateShape &s, QPoint delta) {
     case AnnotateShapeType::Circle:
         s.rect.translate(delta);
         break;
+    case AnnotateShapeType::Line:
     case AnnotateShapeType::Arrow:
         s.p1 += delta;
         s.p2 += delta;
@@ -348,6 +360,9 @@ void paintShape(QPainter &p, const AnnotateShape &s, double scale, QPoint transl
         break;
     case AnnotateShapeType::Circle:
         p.drawEllipse(toDispRect(s.rect));
+        break;
+    case AnnotateShapeType::Line:
+        p.drawLine(toDisp(s.p1), toDisp(s.p2));
         break;
     case AnnotateShapeType::Arrow: {
         const QPointF tail = toDisp(s.p1);
@@ -532,7 +547,7 @@ protected:
             // on both light and dark image content.
             p.setPen(QPen(QColor(50, 160, 255), 1.5));
             p.setBrush(QColor(255, 255, 255));
-            if (shape.type == AnnotateShapeType::Arrow) {
+            if (isSegment(shape.type)) {
                 const QPointF tail(disp.x() + shape.p1.x() * s,
                                    disp.y() + shape.p1.y() * s);
                 const QPointF head(disp.x() + shape.p2.x() * s,
@@ -612,7 +627,7 @@ protected:
         m_dragStartSrc = src;
         m_pending = freshShape();
         m_pending.type = toShapeType(m_tool);
-        if (m_pending.type == AnnotateShapeType::Arrow) {
+        if (isSegment(m_pending.type)) {
             m_pending.p1 = src;
             m_pending.p2 = src;
         } else {
@@ -657,7 +672,7 @@ protected:
         }
         if (!m_dragging) return;
         const QPoint cur = dispToSource(e->pos());
-        if (m_pending.type == AnnotateShapeType::Arrow) {
+        if (isSegment(m_pending.type)) {
             m_pending.p2 = cur;
         } else {
             QRect r(m_dragStartSrc, cur);
@@ -793,6 +808,7 @@ private:
         case Tool::Select: return Qt::ArrowCursor;
         case Tool::Rect:
         case Tool::Circle:
+        case Tool::Line:
         case Tool::Arrow:
         case Tool::Text:   return Qt::CrossCursor;
         }
@@ -845,6 +861,7 @@ private:
         switch (t) {
         case Tool::Rect:   return AnnotateShapeType::Rect;
         case Tool::Circle: return AnnotateShapeType::Circle;
+        case Tool::Line:   return AnnotateShapeType::Line;
         case Tool::Arrow:  return AnnotateShapeType::Arrow;
         case Tool::Text:   return AnnotateShapeType::Text;
         case Tool::Select: return AnnotateShapeType::Rect;  // unreachable; Select handled earlier
@@ -854,7 +871,7 @@ private:
     }
 
     bool isPendingMeaningful() const {
-        if (m_pending.type == AnnotateShapeType::Arrow) {
+        if (isSegment(m_pending.type)) {
             const QPoint d = m_pending.p2 - m_pending.p1;
             return d.manhattanLength() >= 4;
         }
@@ -1075,7 +1092,7 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
 
     // Toolbox: horizontal strip of QToolButtons. Non-exclusive button group
     // so clicking the active tool again toggles it off (mutual exclusivity
-    // is enforced manually in the click handler below); shortcuts Alt+1..5
+    // is enforced manually in the click handler below); shortcuts Alt+1..6
     // map one per tool.
     auto *toolbox = new QWidget(&dlg);
     auto *toolboxLayout = new QHBoxLayout(toolbox);
@@ -1093,9 +1110,10 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
     const ToolDef defs[] = {
         { Tool::Rect,   "Rectangle", "Alt+1" },
         { Tool::Circle, "Circle",    "Alt+2" },
-        { Tool::Arrow,  "Arrow",     "Alt+3" },
-        { Tool::Text,   "Text",      "Alt+4" },
-        { Tool::Select, "Select",    "Alt+5" },
+        { Tool::Line,   "Line",      "Alt+3" },
+        { Tool::Arrow,  "Arrow",     "Alt+4" },
+        { Tool::Text,   "Text",      "Alt+5" },
+        { Tool::Select, "Select",    "Alt+6" },
     };
     const QColor iconColor = dlg.palette().color(QPalette::ButtonText);
     constexpr int kIconPx     = 28;
@@ -1114,7 +1132,7 @@ bool AnnotateAction::configure(QWidget *parent, const QStringList &inputs, const
         btn->setToolTip(QString("Shortcut: %1").arg(d.shortcut));
         btn->setMinimumHeight(kBtnMinH);
         btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        // stretch=1 on every button + no trailing stretch makes the five
+        // stretch=1 on every button + no trailing stretch makes the
         // buttons split the available horizontal space evenly.
         toolboxLayout->addWidget(btn, /*stretch=*/1);
         group->addButton(btn, static_cast<int>(d.tool));

@@ -10,20 +10,20 @@
 #include <QString>
 #include <QStringList>
 
-// Tagged union of the four annotation shapes. Stored in source-image
+// Tagged union of the five annotation shapes. Stored in source-image
 // coordinates so the saved-output rendering at native resolution matches
 // the dialog preview proportionally. Each shape carries its own style so
 // changing the dialog controls after placing a shape only affects future
 // shapes (and, once selection lands, the currently-selected one).
-enum class AnnotateShapeType { Rect, Circle, Arrow, Text };
+enum class AnnotateShapeType { Rect, Circle, Line, Arrow, Text };
 
 struct AnnotateShape {
     AnnotateShapeType type;
     QRect    rect;          // Rect, Circle: normalized bounding box.
-    QPoint   p1, p2;        // Arrow: tail, head. Text uses p1 as the top-left anchor.
+    QPoint   p1, p2;        // Line: endpoints. Arrow: tail, head. Text uses p1 as the top-left anchor.
     QString  text;          // Text.
     QColor   color;         // All shapes.
-    double   strokeWidth = 0.0;  // Rect, Circle, Arrow: source-pixel stroke.
+    double   strokeWidth = 0.0;  // Rect, Circle, Line, Arrow: source-pixel stroke.
     int      fontPx      = 0;    // Text: source-pixel font size.
     QString  fontFamily;         // Text: font family ("" = system default).
 
